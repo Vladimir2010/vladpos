@@ -189,7 +189,13 @@ class POSSystem:
     def add_to_cart(self):
         selected_product = self.selected_product
         if selected_product:
-            product_name = self.product_canvas.getvar(selected_product)
+            product_tuple = self.selected_product
+            product_name = []
+            for j in product_tuple:
+                product_name.append(j)
+            print(product_name)
+
+            print(product_name)
             self.cart_items.append(product_name)
             self.cart_list.insert(tk.END, product_name)
             self.update_total()
