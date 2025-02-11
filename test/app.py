@@ -6,11 +6,14 @@ import psycopg2
 import platform
 import subprocess
 import pandas as pd
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
 from PyQt6.QtGui import QIntValidator, QDoubleValidator
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem
 from PyQt6.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QComboBox, QCheckBox
+from PyQt6.QtPrintSupport import QPrinter, QPrintDialog  # За работа с печат
+from PyQt6.QtGui import QPainter  # За рисуване върху печатащия документ
 
 
 class MainWindow(QMainWindow):
@@ -20,8 +23,9 @@ class MainWindow(QMainWindow):
         self.edit_product_window = None
         self.new_product_window = NewProductWindow(self)  # Създаване на инстанция на прозореца
         self.setWindowTitle("POS система")
-        self.setGeometry(100, 100, 800, 600)
-        self.products_window = ProductsWindow(self)  # Създаване на инстанция на прозореца за продукти
+        self.setGeometry(100, 100, 1000, 700)
+        self.products_window = ProductsWindow(self)
+        self.products_table = ProductsWindow(self)# Създаване на инстанция на прозореца за продукти
 
         menubar = self.menuBar()
 
@@ -39,10 +43,19 @@ class MainWindow(QMainWindow):
 
         work_with_products_action = QAction("Работа с продукти", self)
         operations_menu.addAction(work_with_products_action)
+        work_with_products_action.setShortcut("Ctrl+P")  # Задаване на клавишна комбинация Ctrl+P
+        work_with_products_action.setStatusTip(
+            "Отваря прозореца за управление на продуктите")  # Задаване на подсказка при задържане на мишката върху действието
         work_with_products_action.triggered.connect(self.open_products_window)
 
         new_product_action.triggered.connect(self.open_new_product_window)
         edit_product_action.triggered.connect(self.edit_product)
+
+        # self.create_products_action()  # Извикване на метода за създаване на действието
+        # products_menu = self.menuBar().addMenu("&Продукти")  # Създаване на меню "Продукти"
+        # products_menu.addAction(self.products_action)  # Добавяне на действието към менюто
+
+
 
 
         other_operations_menu = menubar.addMenu("Други Операции:")
@@ -59,6 +72,18 @@ class MainWindow(QMainWindow):
 
         help_menu = menubar.addMenu("Помощ")
         # Тук ще добавим действия към меню "Помощ"
+        self.products_table = QTableWidget()
+        self.products_table.setColumnCount(4)  # Задайте броя на колоните според вашите нужди
+        self.products_table.setHorizontalHeaderLabels(["Баркод", "Име", "Цена", "Количество"])  # Задаване на заглавия на колоните
+        try:
+            main_layout = QVBoxLayout()
+            main_layout.addWidget(self.products_table)
+            self.setLayout(main_layout)
+
+            self.load_products()  # Зареждане на продуктите в таблицата
+        except Exception as e:
+            print(e)
+
 
     def open_products_window(self):
         self.products_window.exec()
@@ -82,10 +107,65 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при редактирането на продукта: {e}")
     # Тук ще добавим менюта, бутони и други елементи на интерфейса
 
+    def create_products_action(self):
+        self.products_action = QAction("&Продукти", self)  # Създаване на действие с текст "Продукти"
+        self.products_action.setShortcut("Ctrl+P")  # Задаване на клавишна комбинация Ctrl+P
+        self.products_action.setStatusTip(
+            "Отваря прозореца за управление на продуктите")  # Задаване на подсказка при задържане на мишката върху действието
+        self.products_action.triggered.connect(
+            self.open_products_window)  # Свързване на сигнала triggered (кликване) с метода open_products_window
+
+    def load_products(self):
+        try:
+            conn = psycopg2.connect(
+                "dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            sql = "SELECT id, name, barcode, price FROM products"  # SQL заявка за извличане на данните за продуктите
+            cur.execute(sql)
+            products = cur.fetchall()
+
+            self.products_table.setRowCount(0)  # Изчистване на таблицата
+            self.products_table.setColumnCount(5)  # Задаване на броя на колоните (id, name, barcode, price, image)
+            self.products_table.setHorizontalHeaderLabels(
+                ["ID", "Име", "Баркод", "Цена", "Картинка"])  # Задаване на заглавките на колоните
+
+            for product in products:
+                row_num = self.products_table.rowCount()
+                self.products_table.insertRow(row_num)
+
+                for i, data in enumerate(product):
+                    item = QTableWidgetItem(str(data))  # Създаване на елемент от таблицата със стойността на данните
+                    self.products_table.setItem(row_num, i, item)  # Добавяне на елемента към съответната клетка
+
+                # Зареждане на картинката на продукта
+                image_path = f"images/{product[2]}.jpg"  # Пътят до картинката на продукта (barcode.jpg)
+                pixmap = QPixmap(image_path)  # Създаване на QPixmap от картинката
+                icon = QIcon(pixmap)  # Създаване на QIcon от QPixmap
+
+                image_item = QTableWidgetItem()  # Създаване на елемент за картинката
+                image_item.setIcon(icon)  # Задаване на иконата на елемента
+                self.products_table.setItem(row_num, 4,
+                                            image_item)  # Добавяне на елемента с картинката към последната колона (image)
+
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Грешка при зареждане на продукти: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при зареждането на продуктите: {e}")
+
 
 class ProductsWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        self.column_mapping = {
+            0: "barcode",
+            1: "name",
+            2: "price",
+            3: "quantity",
+        }
 
         self.setWindowTitle("Продукти")
         self.setGeometry(100, 100, 800, 600)
@@ -107,6 +187,14 @@ class ProductsWindow(QDialog):
         # Създаване на бутон "Изтрий"
         self.delete_button = QPushButton("Изтрий")
         self.delete_button.clicked.connect(self.delete_product)
+
+        # Създаване на бутон "Обнови"
+        self.refresh_button = QPushButton("Обнови")
+        self.refresh_button.clicked.connect(self.load_products)
+
+        self.print_button = QPushButton("Отпечатване")
+        self.print_button.clicked.connect(self.print_table)
+
 
         # Създаване на поле за търсене
         self.search_input = QLineEdit()
@@ -173,11 +261,16 @@ class ProductsWindow(QDialog):
         button_layout.addWidget(self.edit_button)
         # Добавяне на бутона "Изтрий" към layout-а
         button_layout.addWidget(self.delete_button)
+        button_layout.addWidget(self.refresh_button)
+        # Добавяне на бутона "Отпечатване" към layout-а
+        button_layout.addWidget(self.print_button)
         button_layout.addWidget(self.export_button)
         # Добавяне на бутона "Импортиране" към layout-а
         button_layout.addWidget(self.import_button)
         # Добавяне на бутона "Изтрий избраните" към layout-а
         button_layout.addWidget(self.delete_selected_button)
+
+
 
 
         main_layout = QVBoxLayout()
@@ -191,12 +284,6 @@ class ProductsWindow(QDialog):
 
         self.setLayout(main_layout)
 
-        self.column_mapping = {
-            0: "barcode",
-            1: "name",
-            2: "price",
-            3: "quantity",
-        }
 
         self.all_products = []  # Създаване на празен списък за оригиналните данни
 
@@ -211,35 +298,34 @@ class ProductsWindow(QDialog):
             self.all_products = []  # Изчистване на списъка с оригиналните данни
 
             self.products_table.setRowCount(0) # Изчистване на таблицата
-            self.products_table.insertColumn(0)
+            # self.products_table.insertColumn(0)
             for product in products:
                 row_num = self.products_table.rowCount()
                 self.products_table.insertRow(row_num)
-                checkbox = QCheckBox()
-                self.products_table.setCellWidget(row_num, 0, checkbox)  # Добавяне на checkbox към първата колона
+                # checkbox = QCheckBox()
+                # self.products_table.setCellWidget(row_num, 0, checkbox)  # Добавяне на checkbox към първата колона
                 product_data = {}  # Речник за съхранение на данните за продукта
                 for i, data in enumerate(product):
                     item = QTableWidgetItem(str(data))
-                    self.products_table.setItem(row_num, i+1, item)
+                    self.products_table.setItem(row_num, i, item) #i+1
                     product_data[self.column_mapping[i]] = data  # Добавяне на данните в речника
 
                 self.all_products.append(product_data)  # Добавяне на данните за продукта към списъка с оригиналните данни
 
                 # Задаване на подравняване вдясно за елементите от колоните с цена и количество
-                item = self.products_table.item(row_num, 1)  # Вземане на елемента от колоната с количество
+                item = self.products_table.item(row_num, 0)  # Вземане на елемента от колоната с баркода
                 item.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)  # Задаване на подравняване вдясно и вертикално центриране
-                item = self.products_table.item(row_num, 3)  # Вземане на елемента от колоната с цена
+                item = self.products_table.item(row_num, 2)  # Вземане на елемента от колоната с цена
                 item.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)  # Задаване на подравняване вдясно и вертикално центриране
 
-                item = self.products_table.item(row_num, 4)  # Вземане на елемента от колоната с количество
+                item = self.products_table.item(row_num, 3)  # Вземане на елемента от колоната с количество
                 item.setTextAlignment(
                     Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)  # Задаване на подравняване вдясно и вертикално центриране
 
             cur.close()
             conn.close()
-            self.products_table.setColumnWidth(0, 1)  # Задаване на ширина 30 пиксела за първата колона
             self.products_table.setColumnWidth(1, 200)  # Увеличава ширината на втората колона (индекс 1) на 200 пиксела
 
         except Exception as e:
@@ -338,12 +424,15 @@ class ProductsWindow(QDialog):
 
             # Филтриране на данните
             filtered_products = []
-            for product in self.all_products:  # Използваме копие на оригиналните данни
+            for product in self.all_products:
+                print(type(product["price"]))
+                # Използваме копие на оригиналните данни
                 if (name_filter in product["name"].lower() and
                         barcode_filter in product["barcode"].lower() and
                         (not price_filter or str(product["price"]) == price_filter) and
                         (not quantity_filter or str(product["quantity"]) == quantity_filter)):
                     filtered_products.append(product)
+                print(product["price"])
 
             # Обновяване на таблицата
             self.products_table.setRowCount(0)  # Изчистване на таблицата
@@ -357,6 +446,26 @@ class ProductsWindow(QDialog):
         except Exception as e:
             print(f"Грешка при филтриране на продукти: {e}")
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при филтрирането на продуктите: {e}")
+
+    def print_table(self):
+        try:
+            # Създаване на печатащ документ
+            printer = QPrinter()
+
+            # Създаване на диалогов прозорец за настройка на печат
+            print_dialog = QPrintDialog(printer, self)
+            if print_dialog.exec() == QPrintDialog.DialogCode.Accepted:
+                # Създаване на painter за рисуване върху печатащия документ
+                painter = QPainter(printer)
+
+                # Рисуване на данните от таблицата
+                self.products_table.render(painter)
+
+                painter.end()
+
+        except Exception as e:
+            print(f"Грешка при отпечатване на таблицата: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при отпечатването на таблицата: {e}")
 
     # def validate_data(self, row_data):
     #     try:
