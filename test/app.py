@@ -1,12 +1,16 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow
+import os
+import csv
+import codecs
+import psycopg2
+import platform
+import subprocess
+import pandas as pd
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QMessageBox, QHBoxLayout, QFileDialog
-from PyQt6.QtGui import QIntValidator, QDoubleValidator, QPixmap
-import psycopg2
-from PyQt6.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox
+from PyQt6.QtGui import QIntValidator, QDoubleValidator
 from PyQt6.QtGui import QPixmap
-import psycopg2
+from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem
+from PyQt6.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QComboBox, QCheckBox
 
 
 class MainWindow(QMainWindow):
@@ -17,14 +21,12 @@ class MainWindow(QMainWindow):
         self.new_product_window = NewProductWindow(self)  # Създаване на инстанция на прозореца
         self.setWindowTitle("POS система")
         self.setGeometry(100, 100, 800, 600)
-
-        # ... (предходен код)
+        self.products_window = ProductsWindow(self)  # Създаване на инстанция на прозореца за продукти
 
         menubar = self.menuBar()
 
         operations_menu = menubar.addMenu("Операции")
-        # Тук ще добавим действия към меню "Операции"
-        # ... (предходен код)
+
         spravki_menu = operations_menu.addMenu("Справки")
         spravki_menu.addAction("Нова справка")
         spravki_menu.addAction("Редактирай справка")
@@ -35,10 +37,13 @@ class MainWindow(QMainWindow):
         edit_product_action = QAction("Редактирай продукт", self)
         operations_menu.addAction(edit_product_action)
 
-        # ... (предходен код)
+        work_with_products_action = QAction("Работа с продукти", self)
+        operations_menu.addAction(work_with_products_action)
+        work_with_products_action.triggered.connect(self.open_products_window)
 
         new_product_action.triggered.connect(self.open_new_product_window)
         edit_product_action.triggered.connect(self.edit_product)
+
 
         other_operations_menu = menubar.addMenu("Други Операции:")
         # Тук ще добавим действия към меню "Други Операции"
@@ -55,6 +60,8 @@ class MainWindow(QMainWindow):
         help_menu = menubar.addMenu("Помощ")
         # Тук ще добавим действия към меню "Помощ"
 
+    def open_products_window(self):
+        self.products_window.exec()
 
     def open_new_product_window(self):
         result = self.new_product_window.exec()  # Показване на прозореца и очакване за резултат
@@ -74,6 +81,515 @@ class MainWindow(QMainWindow):
             print(f"Грешка при редактиране на продукт: {e}")
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при редактирането на продукта: {e}")
     # Тук ще добавим менюта, бутони и други елементи на интерфейса
+
+
+class ProductsWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Продукти")
+        self.setGeometry(100, 100, 800, 600)
+        # self.setWindowIcoN("")
+
+        # Създаване на таблица за продуктите
+        self.products_table = QTableWidget()
+        self.products_table.setColumnCount(4)  # Задайте броя на колоните според вашите нужди
+        self.products_table.setHorizontalHeaderLabels(["Баркод", "Име", "Цена", "Количество"])  # Задаване на заглавия на колоните
+        self.load_products()  # Зареждане на продуктите в таблицата
+
+        # Създаване на бутони
+        self.new_button = QPushButton("Нов")
+        self.new_button.clicked.connect(self.open_new_product_window)
+
+        self.edit_button = QPushButton("Редактирай")
+        self.edit_button.clicked.connect(self.open_edit_product_window)
+
+        # Създаване на бутон "Изтрий"
+        self.delete_button = QPushButton("Изтрий")
+        self.delete_button.clicked.connect(self.delete_product)
+
+        # Създаване на поле за търсене
+        self.search_input = QLineEdit()
+        self.search_input.textChanged.connect(self.search_products)
+
+        # Създаване на падащо меню за критерий за сортиране
+        self.sort_criterion_combo = QComboBox()
+        self.sort_criterion_combo.addItems(["Име", "Цена", "Количество"])  # Добавяне на възможните критерии
+        self.sort_criterion_combo.currentIndexChanged.connect(self.sort_products)  # Свързване на сигнала currentIndexChanged с функцията за сортиране
+
+        # Създаване на падащо меню за посока на сортиране
+        self.sort_direction_combo = QComboBox()
+        self.sort_direction_combo.addItems(["Възходящо", "Низходящо"])  # Добавяне на възможните посоки
+        self.sort_direction_combo.currentIndexChanged.connect(self.sort_products)  # Свързване на сигнала currentIndexChanged с функцията за сортиране
+
+        # Създаване на бутон "Импортиране"
+        self.import_button = QPushButton("Импортиране")
+        self.import_button.clicked.connect(self.import_from_csv)
+
+        # Създаване на бутон "Изтрий избраните"
+        self.delete_selected_button = QPushButton("Изтрий избраните")
+        self.delete_selected_button.clicked.connect(self.delete_selected_products)
+
+        # Създаване на полета за филтриране
+        self.name_filter_input = QLineEdit()
+        self.name_filter_input.textChanged.connect(
+            self.filter_products)  # Свързване на сигнала textChanged с функцията за филтриране
+
+        self.barcode_filter_input = QLineEdit()
+        self.barcode_filter_input.textChanged.connect(self.filter_products)
+
+        self.price_filter_input = QLineEdit()
+        self.price_filter_input.textChanged.connect(self.filter_products)
+
+        self.quantity_filter_input = QLineEdit()
+        self.quantity_filter_input.textChanged.connect(self.filter_products)
+
+        # Добавяне на полетата за филтриране към layout-а
+        filter_layout = QVBoxLayout()
+        filter_layout.addWidget(QLabel("Име:"))
+        filter_layout.addWidget(self.name_filter_input)
+        filter_layout.addWidget(QLabel("Баркод:"))
+        filter_layout.addWidget(self.barcode_filter_input)
+        filter_layout.addWidget(QLabel("Цена:"))
+        filter_layout.addWidget(self.price_filter_input)
+        filter_layout.addWidget(QLabel("Количество:"))
+        filter_layout.addWidget(self.quantity_filter_input)
+
+        # Добавяне на падащите менюта към layout-а
+        sort_layout = QHBoxLayout()
+        sort_layout.addWidget(self.sort_criterion_combo)
+        sort_layout.addWidget(self.sort_direction_combo)
+
+        # Създаване на бутон "Експортиране"
+        self.export_button = QPushButton("Експортиране")
+        self.export_button.clicked.connect(self.export_to_csv)
+
+        # Свързване на сигнала cellDoubleClicked с функцията за редактиране
+        self.products_table.cellDoubleClicked.connect(self.edit_selected_product)
+
+        # Разположение на елементите
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.new_button)
+        button_layout.addWidget(self.edit_button)
+        # Добавяне на бутона "Изтрий" към layout-а
+        button_layout.addWidget(self.delete_button)
+        button_layout.addWidget(self.export_button)
+        # Добавяне на бутона "Импортиране" към layout-а
+        button_layout.addWidget(self.import_button)
+        # Добавяне на бутона "Изтрий избраните" към layout-а
+        button_layout.addWidget(self.delete_selected_button)
+
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.search_input)
+        main_layout.addWidget(self.products_table)
+        main_layout.addLayout(button_layout)
+        main_layout.addLayout(sort_layout)
+        main_layout.addLayout(filter_layout)
+
+
+
+        self.setLayout(main_layout)
+
+        self.column_mapping = {
+            0: "barcode",
+            1: "name",
+            2: "price",
+            3: "quantity",
+        }
+
+        self.all_products = []  # Създаване на празен списък за оригиналните данни
+
+    def load_products(self):
+        try:
+            conn = psycopg2.connect("dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            sql = "SELECT barcode, name, price, quantity FROM products"
+            cur.execute(sql)
+            products = cur.fetchall()
+            self.all_products = []  # Изчистване на списъка с оригиналните данни
+
+            self.products_table.setRowCount(0) # Изчистване на таблицата
+            self.products_table.insertColumn(0)
+            for product in products:
+                row_num = self.products_table.rowCount()
+                self.products_table.insertRow(row_num)
+                checkbox = QCheckBox()
+                self.products_table.setCellWidget(row_num, 0, checkbox)  # Добавяне на checkbox към първата колона
+                product_data = {}  # Речник за съхранение на данните за продукта
+                for i, data in enumerate(product):
+                    item = QTableWidgetItem(str(data))
+                    self.products_table.setItem(row_num, i+1, item)
+                    product_data[self.column_mapping[i]] = data  # Добавяне на данните в речника
+
+                self.all_products.append(product_data)  # Добавяне на данните за продукта към списъка с оригиналните данни
+
+                # Задаване на подравняване вдясно за елементите от колоните с цена и количество
+                item = self.products_table.item(row_num, 1)  # Вземане на елемента от колоната с количество
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)  # Задаване на подравняване вдясно и вертикално центриране
+                item = self.products_table.item(row_num, 3)  # Вземане на елемента от колоната с цена
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)  # Задаване на подравняване вдясно и вертикално центриране
+
+                item = self.products_table.item(row_num, 4)  # Вземане на елемента от колоната с количество
+                item.setTextAlignment(
+                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)  # Задаване на подравняване вдясно и вертикално центриране
+
+            cur.close()
+            conn.close()
+            self.products_table.setColumnWidth(0, 1)  # Задаване на ширина 30 пиксела за първата колона
+            self.products_table.setColumnWidth(1, 200)  # Увеличава ширината на втората колона (индекс 1) на 200 пиксела
+
+        except Exception as e:
+            print(f"Грешка при зареждане на продукти: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при зареждането на продуктите: {e}")
+
+    def open_new_product_window(self):
+        self.new_product_window = NewProductWindow(self)
+        result = self.new_product_window.exec()
+        if result == QDialog.DialogCode.Accepted:
+            self.load_products()
+
+    def open_edit_product_window(self):
+        selected_rows = self.products_table.selectedItems()
+        if not selected_rows:
+            QMessageBox.warning(self, "Грешка", "Моля, изберете продукт за редактиране.")
+            return
+
+        product_id = int(selected_rows[0].text())  # Вземане на ID на продукта от избрания ред
+
+        self.edit_product_window = EditProductWindow(product_id, self)
+        result = self.edit_product_window.exec()
+        if result == QDialog.DialogCode.Accepted:
+            self.load_products()
+
+    def search_products(self, text):
+        try:
+            conn = psycopg2.connect("dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            sql = "SELECT id, name, barcode, price, quantity FROM products WHERE name ILIKE %s"  # Търсене по име (ILIKE е case-insensitive)
+            cur.execute(sql, ('%' + text + '%',))  # Добавяне на wildcard символи (%) за търсене на подstring
+            products = cur.fetchall()
+
+            self.products_table.setRowCount(0)  # Изчистване на таблицата
+            for product in products:
+                row_num = self.products_table.rowCount()
+                self.products_table.insertRow(row_num)
+                for i, data in enumerate(product):
+                    item = QTableWidgetItem(str(data))
+                    self.products_table.setItem(row_num, i, item)
+
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Грешка при търсене на продукти: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при търсенето на продуктите: {e}")
+
+    def sort_products(self):
+        try:
+            conn = psycopg2.connect(
+                "dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            # Вземане на избрания критерий и посока на сортиране
+            criterion = self.sort_criterion_combo.currentText()
+            direction = self.sort_direction_combo.currentText()
+
+            # Изпълнение на SQL заявка за сортиране на продуктите
+            if criterion == "Име":
+                sql = "SELECT barcode, name, price, quantity FROM products ORDER BY name "
+            elif criterion == "Цена":
+                sql = "SELECT barcode, name, price, quantity FROM products ORDER BY price "
+            elif criterion == "Количество":
+                sql = "SELECT barcode, name, price, quantity FROM products ORDER by quantity "
+
+            if direction == "Низходящо":
+                sql += "DESC"
+
+            cur.execute(sql)
+            products = cur.fetchall()
+
+            self.products_table.setRowCount(0)  # Изчистване на таблицата
+            for product in products:
+                row_num = self.products_table.rowCount()
+                self.products_table.insertRow(row_num)
+                for i, data in enumerate(product):
+                    item = QTableWidgetItem(str(data))
+                    self.products_table.setItem(row_num, i, item)
+
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Грешка при сортиране на продукти: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при сортирането на продуктите: {e}")
+
+    def filter_products(self):
+        try:
+            # Вземане на текста от полетата за филтриране
+            name_filter = self.name_filter_input.text().lower()
+            barcode_filter = self.barcode_filter_input.text().lower()
+            price_filter = self.price_filter_input.text()
+            quantity_filter = self.quantity_filter_input.text()
+
+            # Филтриране на данните
+            filtered_products = []
+            for product in self.all_products:  # Използваме копие на оригиналните данни
+                if (name_filter in product["name"].lower() and
+                        barcode_filter in product["barcode"].lower() and
+                        (not price_filter or str(product["price"]) == price_filter) and
+                        (not quantity_filter or str(product["quantity"]) == quantity_filter)):
+                    filtered_products.append(product)
+
+            # Обновяване на таблицата
+            self.products_table.setRowCount(0)  # Изчистване на таблицата
+            for product in filtered_products:
+                row_num = self.products_table.rowCount()
+                self.products_table.insertRow(row_num)
+                for i, (col_name, value) in enumerate(product.items()):
+                    item = QTableWidgetItem(str(value))
+                    self.products_table.setItem(row_num, i, item)
+
+        except Exception as e:
+            print(f"Грешка при филтриране на продукти: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при филтрирането на продуктите: {e}")
+
+    # def validate_data(self, row_data):
+    #     try:
+    #         # Проверка за празни полета
+    #         if not row_data["name"]:
+    #             raise ValueError("Полето 'име' е задължително.")
+    #         if not row_data["barcode"]:
+    #             raise ValueError("Полето 'баркод' е задължително.")
+    #         if not row_data["price"]:
+    #             raise ValueError("Полето 'цена' е задължително.")
+    #         if not row_data["quantity"]:
+    #             raise ValueError("Полето 'количество' е задължително.")
+    #
+    #         # Проверка за валидни типове данни
+    #         float(row_data["price"])  # Проверка дали цената е число
+    #         int(row_data["quantity"])  # Проверка дали количеството е цяло число
+    #
+    #         return True  # Данните са валидни
+    #
+    #     except ValueError as e:
+    #         QMessageBox.warning(self, "Грешка при валидиране", str(e))
+    #         return False  # Данните не са валидни
+
+    def import_from_csv(self):
+        try:
+            # Отваряне на диалогов прозорец за избор на файл
+            file_path, _ = QFileDialog.getOpenFileName(self, "Избор на CSV файл", "", "CSV Files (*.csv)")
+
+            if file_path:
+                # Четене на данните от CSV файла
+                with open(file_path, "r", encoding="utf-8-sig") as csvfile:
+                    reader = csv.DictReader(csvfile)  # Използване на DictReader за четене на данни по колони
+                    data = list(reader)
+
+                # Добавяне на данните към таблицата
+                self.products_table.setRowCount(0)  # Изчистване на таблицата преди добавяне на нови данни
+                for row_data in data:
+                    row_num = self.products_table.rowCount()
+                    self.products_table.insertRow(row_num)
+                    for col_name, value in row_data.items():
+                        col_index = list(self.column_mapping.keys())[list(self.column_mapping.values()).index(
+                            col_name)]  # Намиране на индекса на колоната по име
+                        item = QTableWidgetItem(value)
+                        self.products_table.setItem(row_num, col_index, item)
+
+                QMessageBox.information(self, "Успех", "Данните са успешно импортирани от CSV файл.")
+
+                # Питаме потребителя дали иска да запази данните в базата данни
+                reply = QMessageBox.question(self, "Запазване в база данни", "Желаете ли да запазите импортираните данни в базата данни?",
+                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+                if reply == QMessageBox.StandardButton.Yes:
+                    try:
+                        conn = psycopg2.connect("dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                        cur = conn.cursor()
+
+                        # Проверяваме дали записите вече съществуват и добавяме само новите
+                        for row_data in data:
+                        #     if not self.validate_data(row_data):
+                        #         continue  # Преминаваме към следващия запис, ако данните не са валидни
+                            # Изграждаме SQL заявка за проверка дали записът вече съществува
+                            check_sql = "SELECT id FROM products WHERE barcode = %s"  # Проверяваме по баркод, можете да промените критерия
+                            cur.execute(check_sql, (row_data["barcode"],))
+                            existing_product = cur.fetchone()
+
+                            if existing_product is None:  # Ако записът не съществува, го добавяме
+                                # Изграждаме SQL заявка за добавяне на нов запис
+                                insert_sql = "INSERT INTO products (name, barcode, price, quantity) VALUES (%s, %s, %s, %s)"  # Адаптирайте колоните според вашите нужди
+                                values = (row_data["name"], row_data["barcode"], row_data["price"], row_data["quantity"])  # Адаптирайте данните според вашите нужди
+                                cur.execute(insert_sql, values)
+
+                        conn.commit()
+                        cur.close()
+                        conn.close()
+
+                        QMessageBox.information(self, "Успех", "Данните са успешно запазени в базата данни.")
+                        self.load_products()  # Обновяваме таблицата с продуктите след импортирането и запазването
+                    except Exception as e:
+                        print(f"Грешка при запазване в базата данни: {e}")
+                        conn.rollback()  # Откатваме транзакцията в случай на грешка
+                        QMessageBox.critical(self, "Грешка", f"Възникна грешка при запазването на данните в базата данни: {e}")
+
+
+        except Exception as e:
+            print(f"Грешка при импортиране от CSV файл: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при импортирането на данните от CSV файл: {e}")
+
+    def export_to_csv(self):
+        try:
+            # Получаване на данните от таблицата, включително заглавките на колоните
+            headers = [self.products_table.horizontalHeaderItem(i).text() for i in
+                       range(self.products_table.columnCount())]
+            data = []
+            for row in range(self.products_table.rowCount()):
+                row_data = {}  # Променяме на речник, за да запазим реда на колоните
+                for col in range(self.products_table.columnCount()):
+                    item = self.products_table.item(row, col)
+                    if item is not None:
+                        column_name = self.column_mapping[col]  # Вземаме името на колоната от речника
+                        row_data[column_name] = item.text()
+                    else:
+                        column_name = self.column_mapping[col]
+                        row_data[column_name] = ""  # Добавяне на празен низ, ако клетката е празна
+                data.append(row_data)
+                print(data)
+
+            # Отваряне на диалогов прозорец за запазване на файл
+            file_path, _ = QFileDialog.getSaveFileName(self, "Запазване на CSV файл", "", "CSV Files (*.csv)")
+
+            if file_path:
+                # Запис на данните в CSV файла с UTF-8 кодиране и BOM
+                with open(file_path, "w", newline="", encoding="utf-8-sig") as csvfile:
+                    fieldnames = list(self.column_mapping.values()) # Вземаме имената на колоните от речника
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=",", quoting=csv.QUOTE_NONNUMERIC)
+                    writer.writeheader() # Запис на заглавките на колоните
+                    writer.writerows(data)  # Запис на данните
+
+                QMessageBox.information(self, "Успех", "Данните са успешно експортирани в CSV файл.")
+                os_name = platform.system()
+                # Питаме потребителя дали иска да отвори файла
+                reply = QMessageBox.question(self, "Отваряне на файл", "Искате ли да отворите файла?",
+                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+                if reply == QMessageBox.StandardButton.Yes:
+                    # Отваряне на файла в зависимост от операционната система
+                    if os_name == "Windows":
+                        os.startfile(file_path)
+                    elif os_name == "Darwin":  # macOS
+                        subprocess.Popen(['open', file_path])
+                    elif os_name == "Linux":
+                        subprocess.Popen(['xdg-open', file_path])
+                    else:
+                        QMessageBox.warning(self, "Грешка", "Неподдържана операционна система.")
+
+        except Exception as e:
+            print(f"Грешка при експортиране в CSV файл: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при експортирането на данните в CSV файл: {e}")
+
+    def edit_selected_product(self, row, column):
+                try:
+                    # Вземане на ID на избрания продукт
+                    product_id = int(self.products_table.item(row, 0).text())
+
+                    # Отваряне на прозореца за редактиране на продукт
+                    self.edit_product_window = EditProductWindow(product_id, self)
+                    result = self.edit_product_window.exec()
+
+                    # Обновяване на таблицата с продуктите, ако потребителят е запазил промените
+                    if result == QDialog.DialogCode.Accepted:
+                        self.load_products()
+
+                except Exception as e:
+                    print(f"Грешка при отваряне на прозореца за редактиране: {e}")
+                    QMessageBox.critical(self, "Грешка",
+                                         f"Възникна грешка при отварянето на прозореца за редактиране: {e}")
+
+    def delete_product(self):
+        selected_items = self.products_table.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Грешка", "Моля, изберете продукт за изтриване.")
+            return
+
+        product_id = int(selected_items[0].text())
+
+        reply = QMessageBox.question(self, "Потвърждение", "Сигурни ли сте, че искате да изтриете този продукт?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                conn = psycopg2.connect(
+                    "dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                cur = conn.cursor()
+
+                sql = "DELETE FROM products WHERE id = %s"
+                cur.execute(sql, (product_id,))
+
+                conn.commit()
+                cur.close()
+                conn.close()
+
+                self.load_products()  # Обновяване на таблицата с продуктите
+
+                QMessageBox.information(self, "Успех", "Продуктът е успешно изтрит.")
+
+            except Exception as e:
+                print(f"Грешка при изтриване на продукт: {e}")
+                QMessageBox.critical(self, "Грешка", f"Възникна грешка при изтриването на продукта: {e}")
+
+    def delete_selected_products(self):
+        try:
+            # Вземане на избраните продукти
+            selected_products = []
+            for row in range(self.products_table.rowCount()):
+                checkbox = self.products_table.cellWidget(row, 0)
+                if checkbox.isChecked():
+                    product_id = int(self.products_table.item(row, 1).text())  # ID-то е във втората колона (индекс 1)
+                    selected_products.append(product_id)
+
+            if not selected_products:
+                QMessageBox.warning(self, "Грешка", "Моля, изберете продукти за изтриване.")
+                return
+
+            # Показване на диалогов прозорец за потвърждение на изтриването
+            reply = QMessageBox.question(self, "Потвърждение",
+                                         "Сигурни ли сте, че искате да изтриете избраните продукти?",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    conn = psycopg2.connect(
+                        "dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                    cur = conn.cursor()
+
+                    # Изтриване на избраните продукти от базата данни
+                    for product_id in selected_products:
+                        sql = "DELETE FROM products WHERE id = %s"
+                        cur.execute(sql, (product_id,))
+
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+
+                    self.load_products()  # Обновяване на таблицата с продуктите
+
+                    QMessageBox.information(self, "Успех", "Избраните продукти са успешно изтрити.")
+
+                except Exception as e:
+                    print(f"Грешка при изтриване на продукти: {e}")
+                    QMessageBox.critical(self, "Грешка", f"Възникна грешка при изтриването на продуктите: {e}")
+
+        except Exception as e:
+            print(f"Грешка при изтриване на продукти: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при изтриването на продуктите: {e}")
 
 
 class NewProductWindow(QDialog):
@@ -188,7 +704,7 @@ class NewProductWindow(QDialog):
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за вмъкване на нов продукт
-            sql = "INSERT INTO products (name, barcode, price, quantity, description, image_path) VALUES (%s, %s, %s, %s, %s)"
+            sql = "INSERT INTO products (name, barcode, price, quantity, description, image_path) VALUES (%s, %s, %s, %s, %s, %s)"
             values = (name, barcode, price, quantity, description, image_path)
             cur.execute(sql, values)
 
@@ -336,7 +852,10 @@ class EditProductWindow(QDialog):
         quantity = self.quantity_input.text()
         description = self.description_input.text()
 
-
+        if hasattr(self, 'image_path'):
+            image_path = self.image_path
+        else:
+            image_path = None
         try:
             # Свързване с базата данни
             conn = psycopg2.connect(

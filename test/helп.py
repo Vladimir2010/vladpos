@@ -217,3 +217,155 @@ class NewProductWindow(QDialog):
         except Exception as e:
             print(f"Грешка при запазване на продукта: {e}")
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при запазването на продукта: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import sys
+from PyQt6.QtWidgets import QApplication, QMainWindow, QAction, QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QWidget, QTableWidget, QTableWidgetItem
+from PyQt6.QtGui import QIntValidator, QDoubleValidator, QPixmap
+import psycopg2
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("POS система")
+        self.setGeometry(100, 100, 800, 600)
+
+        menubar = self.menuBar()
+
+        operations_menu = menubar.addMenu("Операции")
+
+        work_with_products_action = QAction("Работа с продукти", self)
+        operations_menu.addAction(work_with_products_action)
+        work_with_products_action.triggered.connect(self.open_products_window)
+
+        # ... (Други менюта и действия)
+
+        self.products_window = ProductsWindow(self)  # Създаване на инстанция на прозореца за продукти
+
+    def open_products_window(self):
+        self.products_window.show()  # Показване на прозореца за продукти
+
+    # ... (Други методи)
+
+
+class ProductsWindow(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Продукти")
+
+        # Създаване на таблица за продуктите
+        self.products_table = QTableWidget()
+        self.products_table.setColumnCount(5)  # Задайте броя на колоните според вашите нужди
+        self.products_table.setHorizontalHeaderLabels(["ID", "Име", "Баркод", "Цена", "Количество"])  # Задаване на заглавия на колоните
+        self.load_products()  # Зареждане на продуктите в таблицата
+
+        # Създаване на бутони
+        self.new_button = QPushButton("Нов")
+        self.new_button.clicked.connect(self.open_new_product_window)
+
+        self.edit_button = QPushButton("Редактирай")
+        self.edit_button.clicked.connect(self.open_edit_product_window)
+
+        # Създаване на поле за търсене
+        self.search_input = QLineEdit()
+        self.search_input.textChanged.connect(self.search_products)
+
+        # Разположение на елементите
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.new_button)
+        button_layout.addWidget(self.edit_button)
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.search_input)
+        main_layout.addWidget(self.products_table)
+        main_layout.addLayout(button_layout)
+
+        self.setLayout(main_layout)
+
+    def load_products(self):
+        try:
+            conn = psycopg2.connect("dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            sql = "SELECT id, name, barcode, price, quantity FROM products"
+            cur.execute(sql)
+            products = cur.fetchall()
+
+            self.products_table.setRowCount(0)  # Изчистване на таблицата
+            for product in products:
+                row_num = self.products_table.rowCount()
+                self.products_table.insertRow(row_num)
+                for i, data in enumerate(product):
+                    item = QTableWidgetItem(str(data))
+                    self.products_table.setItem(row_num, i, item)
+
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Грешка при зареждане на продукти: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при зареждането на продуктите: {e}")
+
+    def open_new_product_window(self):
+        self.new_product_window = NewProductWindow(self)
+        result = self.new_product_window.exec()
+        if result == QDialog.DialogCode.Accepted:
+            self.load_products()
+
+    def open_edit_product_window(self):
+        selected_rows = self.products_table.selectedItems()
+        if not selected_rows:
+            QMessageBox.warning(self, "Грешка", "Моля, изберете продукт за редактиране.")
+            return
+
+        product_id = int(selected_rows[0].text())  # Вземане на ID на продукта от избрания ред
+
+        self.edit_product_window = EditProductWindow(product_id, self)
+        result = self.edit_product_window.exec()
+        if result == QDialog.DialogCode.Accepted:
+            self.load_products()
+
+    def search_products(self, text):
+        try:
+            conn = psycopg2.connect("dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            sql = "SELECT id, name, barcode, price, quantity FROM products WHERE name ILIKE %s"  # Търсене по име (ILIKE е case-insensitive)
+            cur.execute(sql, ('%' + text + '%',))  # Добавяне на wildcard символи (%) за търсене на подstring
+            products = cur.fetchall()
+
+            self.products_table.setRowCount(0)  # Изчистване на таблицата
+            for product in products:
+                row_num = self.products_table.rowCount()
+                self.products_table.insertRow(row_num)
+                for i, data in enumerate(product):
+                    item = QTableWidgetItem(str(data))
+                    self.products_table.setItem(row_num, i, item)
+
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Грешка при търсене на продукти: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при търсенето на продуктите: {e}")
+
+
+# ... (NewProductWindow и EditProductWindow класове)
