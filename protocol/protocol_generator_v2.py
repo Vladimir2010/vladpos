@@ -3,18 +3,14 @@ import os
 import platform
 import subprocess
 import sys
-
 import psycopg2
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
-from PyQt6.QtGui import QIntValidator, QDoubleValidator
-from PyQt6.QtGui import QPainter  # За рисуване върху печатащия документ
-from PyQt6.QtGui import QPixmap, QIcon
+from docx import Document
+from PyQt6.QtCore import Qt,QDate
+from PyQt6.QtGui import QAction, QIntValidator, QDoubleValidator, QPainter, QPixmap, QIcon
 from PyQt6.QtPrintSupport import QPrinter, QPrintDialog  # За работа с печат
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem
-from PyQt6.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, \
-    QComboBox, QDateEdit, QTextEdit
-
+from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QWidget, QDialog, QLabel, \
+    QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, \
+    QComboBox, QDateEdit, QTextEdit, QSizePolicy, QGridLayout
 
 
 #Create MainWindow for the start screen
@@ -75,6 +71,41 @@ class MainWindow(QMainWindow):
         help_menu = menubar.addMenu("Помощ")
         # Тук ще добавим действия към меню "Помощ"
 
+        #Тук ще сложим редовете
+        self.company_name_label = QLabel("Име на фирма:")
+        self.company_name_input = QLineEdit()
+
+        self.device_model_label = QLabel("Устройство модел:")
+        self.device_model_input = QLineEdit()
+
+        self.serial_number_label = QLabel("Серйен номер:")
+        self.serial_number_input_1 = QLineEdit()
+
+        self.bulstat_label = QLabel("Булстат:")
+        self.bulstat_input = QLineEdit()
+
+        self.fdrid_label = QLabel("FDRID:")
+        self.fdrid_input = QLineEdit()
+
+        self.company_address_label = QLabel("Адрес на фирмата:")
+        self.company_address_input = QLineEdit()
+
+        self.company_manager_label = QLabel("Управител:")
+        self.company_manager_input = QLineEdit()
+
+        self.device_address_label = QLabel("Адрес на устройството:")
+        self.device_address_input = QLineEdit()
+
+        # Създаване на полета за въвеждане на описание
+        self.phone_label = QLabel("Телефон:")
+        self.phone_input = QLineEdit()
+
+        self.load_protocols()
+        id_nums = len(self.all_ids)
+        new_id_num = id_nums + 1
+        self.id_text = str(new_id_num)
+
+
         self.devices_table = QTableWidget()
         self.devices_table.setColumnCount(4)  # Задайте броя на колоните според вашите нужди
         self.devices_table.setHorizontalHeaderLabels(
@@ -85,16 +116,57 @@ class MainWindow(QMainWindow):
         self.protocols_table.setHorizontalHeaderLabels(
             ["ID", "Сериен номер", "Описание на проблема" "Дата"])  # Задаване на заглавия на колоните
 
-        try:
-            main_layout = QVBoxLayout()
-            main_layout.addWidget(self.devices_table)
-            main_layout.addWidget(self.protocols_table)
-            self.setLayout(main_layout)
 
-            self.load_devices()  # Зареждане на устройствата в таблицата
-            self.load_protocols()
-        except Exception as e:
-            print(e)
+        self.device_select_label = QLabel("Изберете устройство")
+        self.device_select_input = QPushButton("Изберете устройство")
+        self.device_select_input.clicked.connect(self.open_devices_window)
+        self.device_select_input.setShortcut("F4")  # Задаване на клавишна комбинация Ctrl+P
+
+        self.clear_button = QPushButton("Изчисти полетата")
+        self.clear_button.clicked.connect(self.clear_fields)
+
+
+        # Създаване на основен уиджет за прозореца
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        for widget in [self.company_name_input, self.company_name_input, self.device_model_label, self.device_model_input, self.serial_number_label,
+                       self.serial_number_input_1, self.bulstat_label, self.bulstat_input, self.fdrid_label, self.fdrid_input, self.company_address_label,
+                       self.company_address_input, self.company_manager_label, self.company_manager_input, self.device_address_label,  self.device_address_input,
+                       self.phone_input, self.device_select_label, self.device_select_input
+                       ]:
+            widget.setFixedWidth(200)
+
+        # Основен layout
+        self.main_layout = QGridLayout(central_widget)
+
+        self.main_layout.addWidget(self.company_name_label, 0, 0)
+        self.main_layout.addWidget(self.company_name_input, 0, 1)
+        self.main_layout.addWidget(self.device_model_label, 1, 0)
+        self.main_layout.addWidget(self.device_model_input, 1, 1)
+        self.main_layout.addWidget(self.serial_number_label, 2, 0)
+        self.main_layout.addWidget(self.serial_number_input_1, 2, 1)
+        self.main_layout.addWidget(self.bulstat_label, 3, 0)
+        self.main_layout.addWidget(self.bulstat_input, 3, 1)
+        self.main_layout.addWidget(self.fdrid_label, 4, 0)
+        self.main_layout.addWidget(self.fdrid_input, 4, 1)
+        self.main_layout.addWidget(self.company_address_label, 5, 0)
+        self.main_layout.addWidget(self.company_address_input, 5, 1)
+        self.main_layout.addWidget(self.company_manager_label, 6, 0)
+        self.main_layout.addWidget(self.company_manager_input, 6, 1)
+        self.main_layout.addWidget(self.device_address_label, 7, 0)
+        self.main_layout.addWidget(self.device_address_input, 7, 1)
+        self.main_layout.addWidget(self.phone_label, 8, 0)
+        self.main_layout.addWidget(self.phone_input, 8, 1)
+        self.main_layout.addWidget(self.clear_button, 9, 0)
+        self.main_layout.addWidget(self.device_select_input, 9, 1)
+
+        # main_layout.addWidget(self.devices_table)
+        # main_layout.addWidget(self.protocols_table)
+        self.setLayout(self.main_layout)
+
+        self.load_devices()  # Зареждане на устройствата в таблицата
+        self.load_protocols()
 
     def open_devices_window(self):
         self.devices_window.exec()
@@ -130,7 +202,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Грешка при редактиране на протоколите: {e}")
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при редактирането на протоколите: {e}")
-
 
     def load_devices(self):
         try:
@@ -211,6 +282,81 @@ class MainWindow(QMainWindow):
             print(f"Грешка при зареждане на протоколите: {e}")
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при зареждането на протоколите: {e}")
 
+    def load_device_data(self):
+        instance_device_id = DevicesWindow()
+        device_id = instance_device_id.choose_product()
+        try:
+            conn = psycopg2.connect(
+                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            # Изпълнение на SQL заявка за извличане на информация за продукта
+            sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices WHERE serial_number = %s"
+            cur.execute(sql, (device_id,))
+            device_data = cur.fetchone()
+
+            if device_data:
+                company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid = device_data
+
+                self.company_name_input.setText(company_name)
+                self.device_model_input.setText(device_model)
+                self.serial_number_input.setText(serial_number)
+                self.bulstat_input.setText(bulstat)
+                self.fdrid_input.setText(fdrid)
+                self.company_address_input.setText(company_address)
+                self.company_manager_input.setText(company_manager)
+                self.device_address_input.setText(device_address)
+                self.phone_input.setText(phone)
+
+            else:
+                QMessageBox.warning(self, "Грешка", "Устройството не е намерен.")
+                self.close()
+
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Грешка при зареждане на данни за устройството: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при зареждането на данните за устройството: {e}")
+
+    def load_protocols(self):
+        # id
+        # serial_number
+        # problem_description
+        # date
+        try:
+            conn = psycopg2.connect(
+                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            sql = "SELECT id FROM protocols"  # SQL заявка за извличане на данните за продуктите
+            cur.execute(sql)
+            ids = cur.fetchall()
+            self.all_ids = []  # Изчистване на списъка с оригиналните данни
+
+            # self.protocols_table.insertColumn(0)
+            for id in ids:
+                self.all_ids.append(id)  # Добавяне на данните за продукта към списъка с оригиналните данни
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Грешка при зареждане на ид-тата: {e}")
+
+    def id_tex(self):
+        return self.id_text
+
+    def clear_fields(self):
+        self.company_name_input.clear()
+        self.device_model_input.clear()
+        self.serial_number_input_1.clear()
+        self.bulstat_input.clear()
+        self.fdrid_input.clear()
+        self.company_address_input.clear()
+        self.company_manager_input.clear()
+        self.device_address_input.clear()
+        self.phone_input.clear()
+
 
 #The window for the work with the devices
 class DevicesWindow(QDialog):
@@ -230,7 +376,7 @@ class DevicesWindow(QDialog):
         }
 
         self.setWindowTitle("Устройства")
-        self.setGeometry(100, 100, 1600, 600)
+        self.setGeometry(100, 100, 1000, 600)
         # self.setWindowIcoN("")
 
         # Създаване на таблица за продуктите
@@ -239,6 +385,10 @@ class DevicesWindow(QDialog):
         self.devices_table.setHorizontalHeaderLabels(
             ["Име на Фирма", "Устройство модел", "Сериен номер", "Булстат", "FDRID", "Адрес на фирмата", "Управител", "Адрес на устройството", "Телефон"])  # Задаване на заглавия на колоните
         self.load_devices()  # Зареждане на продуктите в таблицата
+
+        # Създаване на бутон "Изтрий"
+        self.choose_button = QPushButton("Избери")
+        self.choose_button.clicked.connect(self.choose_product)
 
         # Създаване на бутони
         self.new_button = QPushButton("Нов")
@@ -250,6 +400,7 @@ class DevicesWindow(QDialog):
         # Създаване на бутон "Изтрий"
         self.delete_button = QPushButton("Изтрий")
         self.delete_button.clicked.connect(self.delete_product)
+
 
         # Създаване на бутон "Обнови"
         self.refresh_button = QPushButton("Обнови")
@@ -316,6 +467,7 @@ class DevicesWindow(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.new_button)
         button_layout.addWidget(self.edit_button)
+        button_layout.addWidget(self.choose_button)
         # Добавяне на бутона "Изтрий" към layout-а
         button_layout.addWidget(self.delete_button)
         button_layout.addWidget(self.refresh_button)
@@ -337,6 +489,98 @@ class DevicesWindow(QDialog):
         self.setLayout(main_layout)
 
         self.all_devices = []  # Създаване на празен списък за оригиналните данни
+
+    def choose_product(self):
+        selected_rows = self.devices_table.selectedItems()
+        if not selected_rows:
+            QMessageBox.warning(self, "Грешка", "Моля, изберете устройство.")
+            return
+
+        device_id = selected_rows[2].text()
+        self.device_id = device_id
+        self.load_device_data()
+
+    def load_device_data(self):
+        instance_main = self.parent()
+        try:
+            conn = psycopg2.connect(
+                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            # Изпълнение на SQL заявка за извличане на информация за продукта
+            sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices WHERE serial_number = %s"
+            cur.execute(sql, (self.device_id,))
+            self.device_data = cur.fetchone()
+
+            if self.device_data:
+                company_name, company_address, company_manager, device_address, phone_number, device, self.serial_number, eik, fdrid = self.device_data
+
+                instance_main.company_name_input.setText(company_name)
+                instance_main.device_model_input.setText(device)
+                instance_main.serial_number_input_1.setText(self.serial_number)
+                instance_main.bulstat_input.setText(str(eik))
+                instance_main.fdrid_input.setText(str(fdrid))
+                instance_main.company_address_input.setText(company_address)
+                instance_main.company_manager_input.setText(company_manager)
+                instance_main.device_address_input.setText(device_address)
+                instance_main.phone_input.setText(str(phone_number))
+
+            else:
+                QMessageBox.warning(self, "Грешка", "Устройството не е намерен.")
+                self.close()
+
+            cur.close()
+            conn.close()
+            self.result = instance_main.id_text
+
+            # Създаване на полета за въвеждане на данни
+            instance_main.id_label = QLabel("ID:")
+            instance_main.id_input = QLineEdit()
+            instance_main.id_input.setText(self.result)  # Задаване на текст
+            instance_main.id_input.setReadOnly(True)
+
+            instance_main.serial_number_label = QLabel("Серйен номер:")
+            instance_main.serial_number_input = QLineEdit()
+            instance_main.serial_number_input.setText(self.serial_number)  # Задаване на текст
+            instance_main.serial_number_input.setReadOnly(True)
+
+            instance_main.problem_description_label = QLabel("Описание на проблема:")
+            instance_main.problem_description_input = QTextEdit()
+            instance_main.problem_description_input.setMinimumSize(200, 80)  # Минимален размер
+            instance_main.problem_description_input.setMaximumSize(400, 150)  # Максимален размер
+
+            # Създаване на полета за въвеждане на описание
+            instance_main.date_label = QLabel("Дата:")
+            instance_main.date_input = QDateEdit()
+            instance_main.date_input.setCalendarPopup(True)  # Позволява изскачащ календар
+            instance_main.date_input.setDate(QDate.currentDate())  # Задава днешната дата по подразбиране
+
+            instance_main.save_button_input = QPushButton("Запази протокола")
+            instance_main.save_button_input.clicked.connect(self.save_protocol)
+
+            instance_main.generate_input = QPushButton("Запази протокола")
+            instance_main.generate_input.clicked.connect(self.generate_protocol)
+
+            instance_main.main_layout.addWidget(instance_main.id_label, 0, 2)
+            instance_main.main_layout.addWidget(instance_main.id_input, 0, 3)
+            instance_main.main_layout.addWidget(instance_main.serial_number_label, 1, 2)
+            instance_main.main_layout.addWidget(instance_main.serial_number_input, 1, 3)
+            instance_main.main_layout.addWidget(instance_main.problem_description_label, 2, 2)
+            instance_main.main_layout.addWidget(instance_main.problem_description_input, 2, 3)
+            instance_main.main_layout.addWidget(instance_main.date_label, 3, 2)
+            instance_main.main_layout.addWidget(instance_main.date_input, 3, 3)
+
+            instance_main.main_layout.addWidget(instance_main.save_button_input, 4, 2)
+            instance_main.main_layout.addWidget(instance_main.generate_input, 4, 3)
+
+            print(instance_main.problem_description_input.toPlainText())
+            self.date = instance_main.date_input.date().toString("yyyy-MM-dd")  # Примерен формат
+
+            self.close()
+
+        except Exception as e:
+            print(f"Грешка при зареждане на данни за устройството: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при зареждането на данните за устройството: {e}")
 
     def check_input(self):
         if not self.company_name_filter_input.text().strip() and not self.serial_number_filter_input.text().strip() and not self.bulstat_filter_input.text().strip():
@@ -774,6 +1018,128 @@ class DevicesWindow(QDialog):
         except Exception as e:
             print(f"Грешка при изтриване на продукти: {e}")
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при изтриването на продуктите: {e}")
+
+    def save_protocol(self):
+        instance_main = self.parent()
+        self.problems = []
+
+        # Тук ще добавим код за запазване на продукта в базата данни
+        # Тук ще добавим код за запазване на продукта в базата данни
+        id = self.result
+        serial_number = self.serial_number
+
+        self.problem_description = instance_main.problem_description_input.toPlainText()
+        date = self.date
+
+        self.problems = []
+        self.problems.append(id)
+        self.problems.append(self.problem_description)
+        self.problems.append(date)
+
+
+        if not id or not serial_number  or not date:
+            QMessageBox.warning(self, "Грешка", "Моля, попълнете всички полета.")
+            return
+
+        try:
+            # Свързване с базата данни
+            conn = psycopg2.connect(
+                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            cur = conn.cursor()
+
+            # Изпълнение на SQL заявка за вмъкване на нов продукт
+            sql = "INSERT INTO protocols (id, serial_number, problem_description, date) VALUES (%s, %s, %s, %s)"
+            values = (id, serial_number, self.problem_description, date)
+            cur.execute(sql, values)
+
+            # Запис на промените в базата данни
+            conn.commit()
+
+            # Затваряне на връзката с базата данни
+            cur.close()
+            conn.close()
+
+            QMessageBox.information(self, "Успех", "Протоколът е успешно добавено.")
+            instance_main.clear_fields()
+            self.remove_field(instance_main.id_input)
+            self.remove_field(instance_main.serial_number_input)
+            self.remove_field(instance_main.problem_description_input)
+            self.remove_field(instance_main.date_input)
+            self.remove_field(instance_main.id_label)
+            self.remove_field(instance_main.serial_number_label)
+            self.remove_field(instance_main.problem_description_label)
+            self.remove_field(instance_main.date_label)
+            self.remove_field(instance_main.save_button_input)
+            self.remove_field(instance_main.generate_input)
+            instance_main.serial_number_input.clear()
+            instance_main.clear_fields()
+            self.accept()  # Затваря прозореца след успешно запазване
+
+        except Exception as e:
+            print(f"Грешка при запазване на устройството: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при запазването на протоколът: {e}")
+
+    def generate_protocol(self):
+        instance_main = MainWindow()
+
+        if self.device_data:
+            company_name, company_address, company_manager, device_address, phone_number, device, self.serial_number, eik, fdrid = self.device_data
+
+        document = Document("template.docx")
+
+        protocol_id = self.problems[0]
+        date_string = self.problems[2] # Форматиране на датата
+        # company_name = self.device_data[0]
+        # company_address = self.device_info[1]
+        # company_manager = self.device_info[2]
+        # device_address = self.device_info[3]
+        # phone_number = self.device_info[4]
+        # device = self.device_info[5]
+        # serial_number = self.device_data[6]
+        problem_description = self.problems[1]
+        first_row = protocol_id + '/' + date_string
+
+        for paragraph in document.paragraphs:
+            print(paragraph.text)
+            if "[номер на протокол от базата данни]/[дата[дд-мм-гг]]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[номер на протокол от базата данни]/[дата[дд-мм-гг]]", first_row)
+            if "[Име на фирма]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[Име на фирма]", company_name)
+            if "[адрес на фирма]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[адрес на фирма]", company_address)
+            if "[управител]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[управител]", company_manager)
+            if "[адрес на устройството]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[адрес на устройството]", device_address)
+            if "[телефонен номер]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[телефонен номер]", phone_number)
+            if "[какво е оставено и име и модел]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[какво е оставено и име и модел]", device)
+            if "[сериен номер]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[сериен номер]", self.serial_number)
+            if "[описание на порблема]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[описание на порблема]", problem_description)
+            # elif "[Сериен номер]" in paragraph.text:
+            #     paragraph.text = paragraph.text.replace("[Сериен номер]", serial_number)
+            # elif "[Модел]" in paragraph.text:
+            #     paragraph.text = paragraph.text.replace("[Модел]", device[1])
+            # elif "[Производител]" in paragraph.text:
+            #     paragraph.text = paragraph.text.replace("[Производител]", device[2])
+            # elif "[Описание на проблема]" in paragraph.text:
+            #     paragraph.text = paragraph.text.replace("[Описание на проблема]", problem_description)
+
+        document.save(f"protocol_{protocol_id}_{self.serial_number}_{date_string}.docx")
+
+        QMessageBox.information(self, "Успех", "Протоколът беше генериран успешно.")
+
+
+def remove_field(self, widget):
+        instance_main = self.parent()
+
+        widget.hide()  # Скрива полето
+        instance_main.main_layout.removeWidget(widget)  # Премахва го от layout-а
+        widget.deleteLater()  # Изтрива го от паметта
+
 
 
 #window for new device
@@ -1630,7 +1996,6 @@ class ProtocolsWindow(QDialog):
             print(f"Грешка при изтриване на продукти: {e}")
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при изтриването на продуктите: {e}")
 
-
 #window for new protocol
 class NewProtocolWindow(QDialog):
     def __init__(self, parent=None):
@@ -1700,16 +2065,14 @@ class NewProtocolWindow(QDialog):
 
     def save_protocol(self):
         # Тук ще добавим код за запазване на продукта в базата данни
+        # Тук ще добавим код за запазване на продукта в базата данни
+        id = self.id_input.text()
         serial_number = self.serial_number_input.text()
-        bulstat = self.bulstat_input.text()
-        fdrid = self.fdrid_input.text()
-        company_address = self.company_address_input.text()
-        company_manager = self.company_manager_input.text()
-        device_address = self.device_address_input.text()
-        phone = self.date_input.text()
+        problem_description = self.problem_description_input.text()
+        date = self.date_input.text()
 
 
-        if not company_name or not device_model or not serial_number or not bulstat or not fdrid or not company_address or not company_manager or not device_address or not phone:
+        if not id or not serial_number or not problem_description or not date:
             QMessageBox.warning(self, "Грешка", "Моля, попълнете всички полета.")
             return
 
@@ -1720,8 +2083,8 @@ class NewProtocolWindow(QDialog):
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за вмъкване на нов продукт
-            sql = "INSERT INTO devices (company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-            values = (company_name, company_address, company_manager, device_address, phone, device_model, serial_number, bulstat, fdrid)
+            sql = "INSERT INTO protocols (id, serial_number, problem_description, date) VALUES (%s, %s, %s, %s)"
+            values = (id, serial_number, problem_description, date)
             cur.execute(sql, values)
 
             # Запис на промените в базата данни
@@ -1731,12 +2094,12 @@ class NewProtocolWindow(QDialog):
             cur.close()
             conn.close()
 
-            QMessageBox.information(self, "Успех", "Устройството е успешно добавено.")
+            QMessageBox.information(self, "Успех", "Протоколът е успешно добавено.")
             self.accept()  # Затваря прозореца след успешно запазване
 
         except Exception as e:
             print(f"Грешка при запазване на устройството: {e}")
-            QMessageBox.critical(self, "Грешка", f"Възникна грешка при запазването на устройството: {e}")
+            QMessageBox.critical(self, "Грешка", f"Възникна грешка при запазването на протоколът: {e}")
 
     def load_protocols(self):
         # id
@@ -1883,6 +2246,89 @@ class EditProtocolWindow(QDialog):
         except Exception as e:
             print(f"Грешка при редактиране на протокол: {e}")
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при редактирането на протокола: {e}")
+
+
+    def generate_protocol(self):
+        serial_number = self.serial_number_input.text()
+        problem_description = self.problem_description_input.text()
+
+        if not serial_number or not problem_description:
+            QMessageBox.warning(self, "Предупреждение", "Моля, въведете сериен номер и описание на проблема.")
+            return
+
+        conn = psycopg2.connect(
+            "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+        cur = conn.cursor()
+
+        # Изпълнение на SQL заявка за извличане на информация за продукта
+        sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number FROM devices WHERE serial_number = %s"
+        cur.execute(sql, (serial_number,))
+        device_info = cur.fetchone()
+
+
+        if not device_info:
+            QMessageBox.warning(self, "Предупреждение", "Не е намерена информация за устройството с този сериен номер.")
+            return
+
+        conn = psycopg2.connect(
+            "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+        cur = conn.cursor()
+
+        # Изпълнение на SQL заявка за извличане на информация за продукта
+        sql = "SELECT id, serial_number, problem_description, date FROM protocols WHERE serial_number = %s"
+        cur.execute(sql, (serial_number,))
+        protocol_info = cur.fetchone()
+
+        document = Document("template.doc")
+        selected_date = self.date_edit.date()
+
+        protocol_id = protocol_info[0]
+        date_string = selected_date.toString("dd.MM.yyyy")  # Форматиране на датата
+        company_name = device_info[0]
+        company_address = device_info[1]
+        company_manager = device_info[2]
+        device_address = device_info[3]
+        phone_number = device_info[4]
+        device = device_info[5]
+        serial_number = serial_number
+        problem_description = protocol_info[2]
+
+        for paragraph in document.paragraphs:
+            if "[номер на протокол от базата данни]" in paragraph.text:
+                paragraph.text = paragraph.text.replace("[номер на протокол от базата данни]", protocol_id)
+            elif "[дата[дд-мм-гг]]" in paragraph.text:
+                paragraph.text.replace("[дата[дд-мм-гг]]", date_string)
+            elif "[Име на фирма]" in paragraph.text:
+                paragraph.text.replace("[Име на фирма]", company_name)
+            elif "[адрес на фирма]" in paragraph.text:
+                paragraph.text.replace("[адрес на фирма]", company_address)
+            elif "[управител]" in paragraph.text:
+                paragraph.text.replace("[управител]", company_manager)
+            elif "[адрес на устройството]" in paragraph.text:
+                paragraph.text.replace("[адрес на устройството]", device_address)
+            elif "[телефонен номер]" in paragraph.text:
+                paragraph.text.replace("[телефонен номер]", phone_number)
+            elif "[какво е оставено и име и модел]" in paragraph.text:
+                paragraph.text.replace("[какво е оставено и име и модел]", device)
+            elif "[сериен номер]" in paragraph.text:
+                paragraph.text.replace("[сериен номер]", serial_number)
+            elif "[описание на порблема]" in paragraph.text:
+                paragraph.text.replace("[описание на порблема]", problem_description)
+            # elif "[Сериен номер]" in paragraph.text:
+            #     paragraph.text = paragraph.text.replace("[Сериен номер]", serial_number)
+            # elif "[Модел]" in paragraph.text:
+            #     paragraph.text = paragraph.text.replace("[Модел]", device[1])
+            # elif "[Производител]" in paragraph.text:
+            #     paragraph.text = paragraph.text.replace("[Производител]", device[2])
+            # elif "[Описание на проблема]" in paragraph.text:
+            #     paragraph.text = paragraph.text.replace("[Описание на проблема]", problem_description)
+
+        document.save(f"protocol_{serial_number}_{date_string}.docx")
+
+        QMessageBox.information(self, "Успех", "Протоколът беше генериран успешно.")
+
+        self.save_protocol()
+
 
 
 if __name__ == "__main__":
