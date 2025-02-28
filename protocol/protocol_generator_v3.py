@@ -1,5 +1,6 @@
 import csv
 import os
+import sqlite3
 import platform
 import subprocess
 import sys
@@ -11,6 +12,47 @@ from PyQt6.QtPrintSupport import QPrinter, QPrintDialog  # За работа с 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QWidget, QDialog, QLabel, \
     QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, \
     QComboBox, QDateEdit, QTextEdit, QSizePolicy, QGridLayout
+
+DB_DIR = "database"
+# Функция за създаване на база данни и таблици
+DB_PATH = "database/protocols.db"
+
+
+def initialize_database():
+    if not os.path.exists(DB_DIR):
+        os.makedirs(DB_DIR)
+    # Проверка дали файлът за базата данни съществува
+    if not os.path.exists(DB_PATH):
+        open(DB_PATH, 'w').close()  # Създаване на празен файл за базата
+        print("Създаден е нов файл за базата данни.")
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT,
+        company_address TEXT,
+        company_manager TEXT,
+        device_address TEXT,
+        phone_number TEXT,
+        device TEXT,
+        serial_number TEXT UNIQUE,
+        eik TEXT,
+        fdrid TEXT
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS protocols (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        serial_number TEXT,
+        problem_description TEXT,
+        date TEXT,
+        FOREIGN KEY(serial_number) REFERENCES devices(serial_number)
+    )''')
+
+    conn.commit()
+    conn.close()
+
+
 
 
 #Create MainWindow for the start screen
@@ -214,8 +256,7 @@ class MainWindow(QMainWindow):
 
     def load_devices(self):
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices"  # SQL заявка за извличане на данните за продуктите
@@ -247,8 +288,7 @@ class MainWindow(QMainWindow):
         # problem_description
         # date
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             sql = "SELECT id, serial_number, problem_description, date FROM protocols"  # SQL заявка за извличане на данните за продуктите
@@ -295,12 +335,11 @@ class MainWindow(QMainWindow):
         instance_device_id = DevicesWindow()
         device_id = instance_device_id.choose_product()
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за извличане на информация за продукта
-            sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices WHERE serial_number = %s"
+            sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices WHERE serial_number = ?"
             cur.execute(sql, (device_id,))
             device_data = cur.fetchone()
 
@@ -334,8 +373,7 @@ class MainWindow(QMainWindow):
         # problem_description
         # date
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)# Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             sql = "SELECT id FROM protocols"  # SQL заявка за извличане на данните за продуктите
@@ -532,12 +570,11 @@ class DevicesWindow(QDialog):
     def load_device_data(self):
         instance_main = self.parent()
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за извличане на информация за продукта
-            sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices WHERE serial_number = %s"
+            sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices WHERE serial_number = ?"
             cur.execute(sql, (self.device_id,))
             self.device_data = cur.fetchone()
 
@@ -621,8 +658,7 @@ class DevicesWindow(QDialog):
     def load_devices(self):
         #"Име на Фирма", "Устройство модел", "Сериен номер" "Булстат", "FDRID", "Адрес на фирмата", "Управител", "Адрес на устройството", "Телефон"
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             sql = "SELECT company_name, device, serial_number, eik, fdrid, company_address, company_manager, device_address, phone_number FROM devices"  # SQL заявка за извличане на данните за продуктите
@@ -686,11 +722,10 @@ class DevicesWindow(QDialog):
 
     def search_devices(self, text):
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
-            sql = "SELECT company_name, device, serial_number, eik, fdrid, company_address, company_manager, device_address, phone_number FROM devices WHERE serial_number ILIKE %s"  # Търсене по име (ILIKE е case-insensitive)
+            sql = "SELECT company_name, device, serial_number, eik, fdrid, company_address, company_manager, device_address, phone_number FROM devices WHERE serial_number LIKE ?"  # Търсене по име (ILIKE е case-insensitive)
             cur.execute(sql, ('%' + text + '%',))  # Добавяне на wildcard символи (%) за търсене на подstring
             devices = cur.fetchall()
 
@@ -711,8 +746,7 @@ class DevicesWindow(QDialog):
 
     def sort_devices(self):
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Вземане на избрания критерий и посока на сортиране
@@ -864,8 +898,7 @@ class DevicesWindow(QDialog):
 
                 if reply == QMessageBox.StandardButton.Yes:
                     try:
-                        conn = psycopg2.connect(
-                            "dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                        conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
                         cur = conn.cursor()
 
                         # Проверяваме дали записите вече съществуват и добавяме само новите
@@ -873,13 +906,13 @@ class DevicesWindow(QDialog):
                             #     if not self.validate_data(row_data):
                             #         continue  # Преминаваме към следващия запис, ако данните не са валидни
                             # Изграждаме SQL заявка за проверка дали записът вече съществува
-                            check_sql = "SELECT id FROM products WHERE barcode = %s"  # Проверяваме по баркод, можете да промените критерия
+                            check_sql = "SELECT id FROM products WHERE barcode = ?"  # Проверяваме по баркод, можете да промените критерия
                             cur.execute(check_sql, (row_data["barcode"],))
                             existing_product = cur.fetchone()
 
                             if existing_product is None:  # Ако записът не съществува, го добавяме
                                 # Изграждаме SQL заявка за добавяне на нов запис
-                                insert_sql = "INSERT INTO products (name, barcode, price, quantity) VALUES (%s, %s, %s, %s)"  # Адаптирайте колоните според вашите нужди
+                                insert_sql = "INSERT INTO products (name, barcode, price, quantity) VALUES (?, ?, ?, ?)"  # Адаптирайте колоните според вашите нужди
                                 values = (row_data["name"], row_data["barcode"], row_data["price"],
                                           row_data["quantity"])  # Адаптирайте данните според вашите нужди
                                 cur.execute(insert_sql, values)
@@ -983,11 +1016,10 @@ class DevicesWindow(QDialog):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                conn = psycopg2.connect(
-                    "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
                 cur = conn.cursor()
 
-                sql = "DELETE FROM devices WHERE serial_number = %s"
+                sql = "DELETE FROM devices WHERE serial_number = ?"
                 cur.execute(sql, (device_id,))
 
                 conn.commit()
@@ -1023,13 +1055,12 @@ class DevicesWindow(QDialog):
 
             if reply == QMessageBox.StandardButton.Yes:
                 try:
-                    conn = psycopg2.connect(
-                        "dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                    conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
                     cur = conn.cursor()
 
                     # Изтриване на избраните продукти от базата данни
                     for product_id in selected_products:
-                        sql = "DELETE FROM products WHERE id = %s"
+                        sql = "DELETE FROM products WHERE id = ?"
                         cur.execute(sql, (product_id,))
 
                     conn.commit()
@@ -1072,12 +1103,11 @@ class DevicesWindow(QDialog):
 
         try:
             # Свързване с базата данни
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH) # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за вмъкване на нов продукт
-            sql = "INSERT INTO protocols (id, serial_number, problem_description, date) VALUES (%s, %s, %s, %s)"
+            sql = "INSERT INTO protocols (id, serial_number, problem_description, date) VALUES (?, ?, ?, ?)"
             values = (id, serial_number, self.problem_description, date)
             cur.execute(sql, values)
 
@@ -1297,12 +1327,11 @@ class NewDeviceWindow(QDialog):
 
         try:
             # Свързване с базата данни
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за вмъкване на нов продукт
-            sql = "INSERT INTO devices (company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            sql = "INSERT INTO devices (company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
             values = (company_name, company_address, company_manager, device_address, phone, device_model, serial_number, bulstat, fdrid)
             cur.execute(sql, values)
 
@@ -1395,12 +1424,11 @@ class EditDeviceWindow(QDialog):
 
     def load_device_data(self):
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH) # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за извличане на информация за продукта
-            sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices WHERE serial_number = %s"
+            sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid FROM devices WHERE serial_number = ?"
             cur.execute(sql, (self.device_id,))
             device_data = cur.fetchone()
 
@@ -1458,14 +1486,13 @@ class EditDeviceWindow(QDialog):
 
         try:
             # Свързване с базата данни
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH) # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за актуализиране на информацията за продукта
-            # sql = "INSERT INTO devices (company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            # sql = "INSERT INTO devices (company_name, company_address, company_manager, device_address, phone_number, device, serial_number, eik, fdrid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
-            sql = "UPDATE devices SET company_name = %s, company_address = %s, company_manager = %s, device_address = %s, phone_number = %s, device = %s, serial_number = %s, eik = %s, fdrid = %s WHERE serial_number = %s"
+            sql = "UPDATE devices SET company_name = ?, company_address = ?, company_manager = ?, device_address = ?, phone_number = ?, device = ?, serial_number = ?, eik = ?, fdrid = ? WHERE serial_number = ?"
             values = (company_name, company_address, company_manager, device_address, phone, device_model, serial_number, bulstat, fdrid, self.device_id)
             cur.execute(sql, values)
 
@@ -1620,8 +1647,7 @@ class ProtocolsWindow(QDialog):
         # problem_description
         # date
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             sql = "SELECT id, serial_number, problem_description, date FROM protocols"  # SQL заявка за извличане на данните за продуктите
@@ -1707,11 +1733,10 @@ class ProtocolsWindow(QDialog):
 
     def search_devices(self, text):
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH) # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
-            sql = "SELECT id, serial_number, problem_description, date FROM protocols WHERE serial_number ILIKE %s"  # Търсене по име (ILIKE е case-insensitive)
+            sql = "SELECT id, serial_number, problem_description, date FROM protocols WHERE serial_number LIKE ?"  # Търсене по име (ILIKE е case-insensitive)
             cur.execute(sql, ('%' + text + '%',))  # Добавяне на wildcard символи (%) за търсене на подstring
             protocols = cur.fetchall()
 
@@ -1732,8 +1757,7 @@ class ProtocolsWindow(QDialog):
 
     def sort_devices(self):
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH) # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Вземане на избрания критерий и посока на сортиране
@@ -1883,8 +1907,7 @@ class ProtocolsWindow(QDialog):
 
                 if reply == QMessageBox.StandardButton.Yes:
                     try:
-                        conn = psycopg2.connect(
-                            "dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                        conn = sqlite3.connect(DB_PATH) # Заменете с вашите данни за връзка
                         cur = conn.cursor()
 
                         # Проверяваме дали записите вече съществуват и добавяме само новите
@@ -1892,13 +1915,13 @@ class ProtocolsWindow(QDialog):
                             #     if not self.validate_data(row_data):
                             #         continue  # Преминаваме към следващия запис, ако данните не са валидни
                             # Изграждаме SQL заявка за проверка дали записът вече съществува
-                            check_sql = "SELECT id FROM products WHERE barcode = %s"  # Проверяваме по баркод, можете да промените критерия
+                            check_sql = "SELECT id FROM products WHERE barcode = ?"  # Проверяваме по баркод, можете да промените критерия
                             cur.execute(check_sql, (row_data["barcode"],))
                             existing_product = cur.fetchone()
 
                             if existing_product is None:  # Ако записът не съществува, го добавяме
                                 # Изграждаме SQL заявка за добавяне на нов запис
-                                insert_sql = "INSERT INTO products (name, barcode, price, quantity) VALUES (%s, %s, %s, %s)"  # Адаптирайте колоните според вашите нужди
+                                insert_sql = "INSERT INTO products (name, barcode, price, quantity) VALUES (?, ?, ?, ?)"  # Адаптирайте колоните според вашите нужди
                                 values = (row_data["name"], row_data["barcode"], row_data["price"],
                                           row_data["quantity"])  # Адаптирайте данните според вашите нужди
                                 cur.execute(insert_sql, values)
@@ -2002,11 +2025,10 @@ class ProtocolsWindow(QDialog):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                conn = psycopg2.connect(
-                    "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                conn = sqlite3.connect(DB_PATH)# Заменете с вашите данни за връзка
                 cur = conn.cursor()
 
-                sql = "DELETE FROM protocols WHERE id = %s"
+                sql = "DELETE FROM protocols WHERE id = ?"
                 cur.execute(sql, (protocol_id,))
 
                 conn.commit()
@@ -2042,13 +2064,12 @@ class ProtocolsWindow(QDialog):
 
             if reply == QMessageBox.StandardButton.Yes:
                 try:
-                    conn = psycopg2.connect(
-                        "dbname=pos_system user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+                    conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
                     cur = conn.cursor()
 
                     # Изтриване на избраните продукти от базата данни
                     for product_id in selected_products:
-                        sql = "DELETE FROM products WHERE id = %s"
+                        sql = "DELETE FROM products WHERE id = ?"
                         cur.execute(sql, (product_id,))
 
                     conn.commit()
@@ -2156,12 +2177,11 @@ class NewProtocolWindow(QDialog):
 
         try:
             # Свързване с базата данни
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за вмъкване на нов продукт
-            sql = "INSERT INTO protocols (id, serial_number, problem_description, date) VALUES (%s, %s, %s, %s)"
+            sql = "INSERT INTO protocols (id, serial_number, problem_description, date) VALUES (?, ?, ?, ?)"
             values = (id, serial_number, problem_description, date)
             cur.execute(sql, values)
 
@@ -2185,8 +2205,7 @@ class NewProtocolWindow(QDialog):
         # problem_description
         # date
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             sql = "SELECT id FROM protocols"  # SQL заявка за извличане на данните за продуктите
@@ -2254,12 +2273,11 @@ class EditProtocolWindow(QDialog):
 
     def load_protocol_data(self):
         try:
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за извличане на информация за продукта
-            sql = "SELECT id, serial_number, problem_description, date FROM protocols WHERE id = %s"
+            sql = "SELECT id, serial_number, problem_description, date FROM protocols WHERE id = ?"
             cur.execute(sql, (self.protocol_id,))
             protocol_data = cur.fetchone()
 
@@ -2309,12 +2327,12 @@ class EditProtocolWindow(QDialog):
 
         try:
             # Свързване с базата данни
-            conn = psycopg2.connect(
-                "dbname=protocols user=postgres password=VA0885281774 host=localhost")  # Заменете с вашите данни за връзка
+            conn = sqlite3.connect(DB_PATH)  # Заменете с вашите данни за връзка
+            # Заменете с вашите данни за връзка
             cur = conn.cursor()
 
             # Изпълнение на SQL заявка за актуализиране на информацията за продукта
-            sql = "UPDATE products SET serial_number = %s, problem_description = %s, date = %s WHERE id = %s"
+            sql = "UPDATE products SET serial_number = ?, problem_description = ?, date = ? WHERE id = ?"
             values = (serial_number, problem_description, date, self.device_id)
             cur.execute(sql, values)
 
@@ -2330,91 +2348,84 @@ class EditProtocolWindow(QDialog):
             QMessageBox.critical(self, "Грешка", f"Възникна грешка при редактирането на протокола: {e}")
 
 
-    def generate_protocol(self):
-        serial_number = self.serial_number_input.text()
-        problem_description = self.problem_description_input.text()
-
-        if not serial_number or not problem_description:
-            QMessageBox.warning(self, "Предупреждение", "Моля, въведете сериен номер и описание на проблема.")
-            return
-
-        conn = psycopg2.connect(
-            "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
-        cur = conn.cursor()
-
-        # Изпълнение на SQL заявка за извличане на информация за продукта
-        sql = "SELECT company_name, company_address, company_manager, device_address, phone_number, device, serial_number FROM devices WHERE serial_number = %s"
-        cur.execute(sql, (serial_number,))
-        device_info = cur.fetchone()
-
-
-        if not device_info:
-            QMessageBox.warning(self, "Предупреждение", "Не е намерена информация за устройството с този сериен номер.")
-            return
-
-        conn = psycopg2.connect(
-            "dbname=protocols user=postgres password=VA0885281774")  # Заменете с вашите данни за връзка
-        cur = conn.cursor()
-
-        # Изпълнение на SQL заявка за извличане на информация за продукта
-        sql = "SELECT id, serial_number, problem_description, date FROM protocols WHERE serial_number = %s"
-        cur.execute(sql, (serial_number,))
-        protocol_info = cur.fetchone()
-
-        document = Document("template.doc")
-        selected_date = self.date_edit.date()
-
-        protocol_id = protocol_info[0]
-        date_string = selected_date.toString("dd.MM.yyyy")  # Форматиране на датата
-        company_name = device_info[0]
-        company_address = device_info[1]
-        company_manager = device_info[2]
-        device_address = device_info[3]
-        phone_number = device_info[4]
-        device = device_info[5]
-        serial_number = serial_number
-        problem_description = protocol_info[2]
-
-        for paragraph in document.paragraphs:
-            if "[номер на протокол от базата данни]" in paragraph.text:
-                paragraph.text = paragraph.text.replace("[номер на протокол от базата данни]", protocol_id)
-            elif "[дата[дд-мм-гг]]" in paragraph.text:
-                paragraph.text.replace("[дата[дд-мм-гг]]", date_string)
-            elif "[Име на фирма]" in paragraph.text:
-                paragraph.text.replace("[Име на фирма]", company_name)
-            elif "[адрес на фирма]" in paragraph.text:
-                paragraph.text.replace("[адрес на фирма]", company_address)
-            elif "[управител]" in paragraph.text:
-                paragraph.text.replace("[управител]", company_manager)
-            elif "[адрес на устройството]" in paragraph.text:
-                paragraph.text.replace("[адрес на устройството]", device_address)
-            elif "[телефонен номер]" in paragraph.text:
-                paragraph.text.replace("[телефонен номер]", phone_number)
-            elif "[какво е оставено и име и модел]" in paragraph.text:
-                paragraph.text.replace("[какво е оставено и име и модел]", device)
-            elif "[сериен номер]" in paragraph.text:
-                paragraph.text.replace("[сериен номер]", serial_number)
-            elif "[описание на порблема]" in paragraph.text:
-                paragraph.text.replace("[описание на порблема]", problem_description)
-            # elif "[Сериен номер]" in paragraph.text:
-            #     paragraph.text = paragraph.text.replace("[Сериен номер]", serial_number)
-            # elif "[Модел]" in paragraph.text:
-            #     paragraph.text = paragraph.text.replace("[Модел]", device[1])
-            # elif "[Производител]" in paragraph.text:
-            #     paragraph.text = paragraph.text.replace("[Производител]", device[2])
-            # elif "[Описание на проблема]" in paragraph.text:
-            #     paragraph.text = paragraph.text.replace("[Описание на проблема]", problem_description)
-
-        document.save(f"protocol_{serial_number}_{date_string}.docx")
-
-        QMessageBox.information(self, "Успех", "Протоколът беше генериран успешно.")
-
-        self.save_protocol()
+    # def generate_protocol(self):
+    #     instance_main = MainWindow()
+    #
+    #     if self.device_data:
+    #         company_name, company_address, company_manager, device_address, phone_number, device, self.serial_number, eik, fdrid = self.device_data
+    #
+    #     document = Document("template.docx")
+    #
+    #     protocol_id = self.problems[0]
+    #     date_string = self.problems[2] # Форматиране на датата
+    #     # company_name = self.device_data[0]
+    #     # company_address = self.device_info[1]
+    #     # company_manager = self.device_info[2]
+    #     # device_address = self.device_info[3]
+    #     # phone_number = self.device_info[4]
+    #     # device = self.device_info[5]
+    #     # serial_number = self.device_data[6]
+    #     problem_description = self.problems[1]
+    #     first_row = protocol_id + '/' + date_string
+    #
+    #     for paragraph in document.paragraphs:
+    #         print(paragraph.text)
+    #         if "[номер на протокол от базата данни]/[дата[дд-мм-гг]]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[номер на протокол от базата данни]/[дата[дд-мм-гг]]", first_row)
+    #         if "[Име на фирма]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[Име на фирма]", company_name)
+    #         if "[адрес на фирма]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[адрес на фирма]", company_address)
+    #         if "[управител]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[управител]", company_manager)
+    #         if "[адрес на устройството]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[адрес на устройството]", device_address)
+    #         if "[телефонен номер]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[телефонен номер]", phone_number)
+    #         if "[какво е оставено и име и модел]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[какво е оставено и име и модел]", device)
+    #         if "[сериен номер]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[сериен номер]", self.serial_number)
+    #         if "[описание на порблема]" in paragraph.text:
+    #             paragraph.text = paragraph.text.replace("[описание на порблема]", problem_description)
+    #         # elif "[Сериен номер]" in paragraph.text:
+    #         #     paragraph.text = paragraph.text.replace("[Сериен номер]", serial_number)
+    #         # elif "[Модел]" in paragraph.text:
+    #         #     paragraph.text = paragraph.text.replace("[Модел]", device[1])
+    #         # elif "[Производител]" in paragraph.text:
+    #         #     paragraph.text = paragraph.text.replace("[Производител]", device[2])
+    #         # elif "[Описание на проблема]" in paragraph.text:
+    #         #     paragraph.text = paragraph.text.replace("[Описание на проблема]", problem_description)
+    #     pre_file_path = f"protocol_{protocol_id}_{self.serial_number}_{date_string}.docx"
+    #
+    #     file_path, _ = QFileDialog.getSaveFileName(self, "Запазване на Docx файл", os.path.join(os.path.expanduser("~"), "Documents", pre_file_path), "Docx Files (*.docx);; All Files (*)")
+    #     file_path = file_path+''+pre_file_path
+    #     document.save(f"{file_path}")
+    #
+    #     QMessageBox.information(self, "Успех", "Протоколът беше генериран успешно.")
+    #     self.remove_fields_auto()
+    #     os_name = platform.system()
+    #     # Питаме потребителя дали иска да отвори файла
+    #     reply = QMessageBox.question(self, "Отваряне на файл", "Искате ли да отворите файла?",
+    #                                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    #
+    #     if reply == QMessageBox.StandardButton.Yes:
+    #         # Отваряне на файла в зависимост от операционната система
+    #         if os_name == "Windows":
+    #             os.startfile(file_path)
+    #         elif os_name == "Darwin":  # macOS
+    #             subprocess.Popen(['open', file_path])
+    #         elif os_name == "Linux":
+    #             subprocess.Popen(['xdg-open', file_path])
+    #         else:
+    #             QMessageBox.warning(self, "Грешка", "Неподдържана операционна система.")
 
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    # Изпълнява се при стартиране
+    initialize_database()
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
