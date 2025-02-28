@@ -435,10 +435,28 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QIcon, QAction, QPixmap
 from PyQt6.QtCore import Qt
 import sqlite3
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QFrame, QVBoxLayout, QHBoxLayout, QWidget, QMenu,
+    QSizePolicy, QLabel, QLineEdit, QPushButton, QComboBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QDialog, QDialogButtonBox, QCalendarWidget, QTextEdit, QListWidget
+)
+from PyQt6.QtGui import QIcon, QAction, QPixmap
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QFrame, QVBoxLayout, QHBoxLayout, QWidget, QMenu,
+    QLabel, QLineEdit, QPushButton, QComboBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QListWidget, QAbstractItemView
+)
+from PyQt6.QtGui import QIcon, QAction, QPixmap
+from PyQt6.QtCore import Qt, QTimer
+import sqlite3
+import json
+from PyQt6.QtWidgets import QMessageBox
+
 
 DB_DIR = "database"
 # Функция за създаване на база данни и таблици
-DB_PATH = "database/pos_sys.db"
+DB_PATH = "database/pos_syste.db"
 
 def create_database():
     if not os.path.exists(DB_DIR):
@@ -467,16 +485,12 @@ def create_database():
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS documents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        document_number TEXT NOT NULL,
-        customer_reference_number INTEGER,
-        invoice_data TEXT, -- JSON format: {"number": "inv123", "date": "2025-02-28"}
         products TEXT, -- JSON format: [{"name": "product1", "barcode": "123", "quantity": 2, "unit_price": 10.0}, ...]
         total_amount REAL NOT NULL,
         amount_paid REAL NOT NULL,
         change REAL NOT NULL,
         payment_type TEXT NOT NULL,
-        cash_register_numbers TEXT NOT NULL,
-        FOREIGN KEY (customer_reference_number) REFERENCES customers(id)
+        cash_register_numbers TEXT NOT NULL
     )
     ''')
 
@@ -484,7 +498,6 @@ def create_database():
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        image BLOB,
         name TEXT NOT NULL,
         barcode TEXT NOT NULL,
         unit_price REAL NOT NULL
@@ -507,12 +520,17 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QPushButton,
     QComboBox, QLineEdit, QFrame
 )
-
+import sqlite3
+from PyQt6.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QPushButton,
+    QComboBox, QLineEdit, QFrame, QFileDialog
+)
+from openpyxl import Workbook, load_workbook
 
 class ProductsWindow(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("New Window")
+        self.setWindowTitle("Products Window")
         self.setGeometry(100, 100, 600, 400)
 
         main_layout = QVBoxLayout()
@@ -527,23 +545,39 @@ class ProductsWindow(QDialog):
         self.table.setHorizontalHeaderLabels(["Name", "Barcode", "Price"])
         first_layout.addWidget(self.table)
 
+        # Load products into the table
+        self.load_products()
+
         # Second Frame
         second_frame = QFrame()
         second_layout = QVBoxLayout()
         second_frame.setLayout(second_layout)
 
         buttons_layout = QHBoxLayout()
-        self.add_button = QPushButton("Add New Entry")
-        self.add_button.clicked.connect(self.open_add_entry_window)
+        self.add_button = QPushButton("Add New Product")
+        self.add_button.clicked.connect(self.open_add_product_window)
         buttons_layout.addWidget(self.add_button)
 
-        self.edit_button = QPushButton("Edit Entry")
-        self.edit_button.clicked.connect(self.open_edit_entry_window)
+        self.edit_button = QPushButton("Edit Product")
+        self.edit_button.clicked.connect(self.open_edit_product_window)
         buttons_layout.addWidget(self.edit_button)
 
-        for i in range(5):
-            button = QPushButton(f"Button {i + 3}")
-            buttons_layout.addWidget(button)
+        self.delete_button = QPushButton("Delete Product")
+        self.delete_button.clicked.connect(self.delete_product)
+        buttons_layout.addWidget(self.delete_button)
+
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.load_products)
+        buttons_layout.addWidget(self.refresh_button)
+
+        self.export_button = QPushButton("Export to XLSX")
+        self.export_button.clicked.connect(self.export_to_xlsx)
+        buttons_layout.addWidget(self.export_button)
+
+        self.import_button = QPushButton("Import from XLSX")
+        self.import_button.clicked.connect(self.import_from_xlsx)
+        buttons_layout.addWidget(self.import_button)
+
         second_layout.addLayout(buttons_layout)
 
         combo_layout = QHBoxLayout()
@@ -571,21 +605,90 @@ class ProductsWindow(QDialog):
 
         self.setLayout(main_layout)
 
-    def open_add_entry_window(self):
-        self.add_entry_window = AddEntryWindow(self.table)
-        self.add_entry_window.exec()
+    def load_products(self):
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        cursor.execute('SELECT name, barcode, unit_price FROM products')
+        products = cursor.fetchall()
 
-    def open_edit_entry_window(self):
+        self.table.setRowCount(len(products))
+        for row_idx, product in enumerate(products):
+            self.table.setItem(row_idx, 0, QTableWidgetItem(product[0]))
+            self.table.setItem(row_idx, 1, QTableWidgetItem(product[1]))
+            self.table.setItem(row_idx, 2, QTableWidgetItem(str(product[2])))
+
+        connection.close()
+
+    def open_add_product_window(self):
+        self.add_product_window = AddProductWindow(self.table)
+        self.add_product_window.exec()
+
+    def open_edit_product_window(self):
         current_row = self.table.currentRow()
         if current_row >= 0:
-            self.edit_entry_window = EditEntryWindow(self.table, current_row)
-            self.edit_entry_window.exec()
+            self.edit_product_window = EditProductWindow(self.table, current_row)
+            self.edit_product_window.exec()
 
+    def delete_product(self):
+        current_row = self.table.currentRow()
+        if current_row >= 0:
+            barcode = self.table.item(current_row, 1).text()
+            connection = sqlite3.connect(DB_PATH)
+            cursor = connection.cursor()
+            cursor.execute('DELETE FROM products WHERE barcode = ?', (barcode,))
+            connection.commit()
+            connection.close()
+            self.table.removeRow(current_row)
+            self.load_products()
 
-class AddEntryWindow(QDialog):
+    def export_to_xlsx(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Excel Files (*.xlsx)")
+        if file_path:
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "Products"
+
+            headers = ["Name", "Barcode", "Price"]
+            sheet.append(headers)
+
+            for row in range(self.table.rowCount()):
+                row_data = []
+                for column in range(self.table.columnCount()):
+                    item = self.table.item(row, column)
+                    row_data.append(item.text() if item else "")
+                sheet.append(row_data)
+
+            workbook.save(file_path)
+
+    def import_from_xlsx(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Excel Files (*.xlsx)")
+        if file_path:
+            workbook = load_workbook(filename=file_path)
+            sheet = workbook.active
+
+            self.table.setRowCount(0)
+
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                row_position = self.table.rowCount()
+                self.table.insertRow(row_position)
+                for column, value in enumerate(row):
+                    self.table.setItem(row_position, column, QTableWidgetItem(str(value)))
+
+            # Optionally, update the database with the imported data
+            connection = sqlite3.connect(DB_PATH)
+            cursor = connection.cursor()
+            cursor.execute('DELETE FROM products')
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                cursor.execute('''
+                    INSERT INTO products (name, barcode, unit_price) VALUES (?, ?, ?)
+                ''', row)
+            connection.commit()
+            connection.close()
+
+class AddProductWindow(QDialog):
     def __init__(self, table):
         super().__init__()
-        self.setWindowTitle("Add Entry")
+        self.setWindowTitle("Add Product")
         self.setGeometry(100, 100, 300, 200)
         self.table = table
 
@@ -603,29 +706,39 @@ class AddEntryWindow(QDialog):
         layout.addWidget(self.price_input)
 
         add_button = QPushButton("Add")
-        add_button.clicked.connect(self.add_entry)
+        add_button.clicked.connect(self.add_product)
         layout.addWidget(add_button)
 
         self.setLayout(layout)
 
-    def add_entry(self):
+    def add_product(self):
         name = self.name_input.text()
         barcode = self.barcode_input.text()
         price = self.price_input.text()
 
+        # Add to the table
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
         self.table.setItem(row_position, 0, QTableWidgetItem(name))
         self.table.setItem(row_position, 1, QTableWidgetItem(barcode))
         self.table.setItem(row_position, 2, QTableWidgetItem(price))
 
+        # Add to the database
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        cursor.execute('''
+            INSERT INTO products (name, barcode, unit_price) VALUES (?, ?, ?)
+        ''', (name, barcode, price))
+        connection.commit()
+        connection.close()
+
         self.accept()
 
 
-class EditEntryWindow(QDialog):
+class EditProductWindow(QDialog):
     def __init__(self, table, row):
         super().__init__()
-        self.setWindowTitle("Edit Entry")
+        self.setWindowTitle("Edit Product")
         self.setGeometry(100, 100, 300, 200)
         self.table = table
         self.row = row
@@ -643,23 +756,37 @@ class EditEntryWindow(QDialog):
         layout.addWidget(QLabel("Price"))
         layout.addWidget(self.price_input)
 
-        self.load_entry()
+        self.load_product()
 
         edit_button = QPushButton("Edit")
-        edit_button.clicked.connect(self.edit_entry)
+        edit_button.clicked.connect(self.edit_product)
         layout.addWidget(edit_button)
 
         self.setLayout(layout)
 
-    def load_entry(self):
+    def load_product(self):
         self.name_input.setText(self.table.item(self.row, 0).text())
         self.barcode_input.setText(self.table.item(self.row, 1).text())
         self.price_input.setText(self.table.item(self.row, 2).text())
 
-    def edit_entry(self):
-        self.table.setItem(self.row, 0, QTableWidgetItem(self.name_input.text()))
-        self.table.setItem(self.row, 1, QTableWidgetItem(self.barcode_input.text()))
-        self.table.setItem(self.row, 2, QTableWidgetItem(self.price_input.text()))
+    def edit_product(self):
+        name = self.name_input.text()
+        barcode = self.barcode_input.text()
+        price = self.price_input.text()
+
+        # Update the table
+        self.table.setItem(self.row, 0, QTableWidgetItem(name))
+        self.table.setItem(self.row, 1, QTableWidgetItem(barcode))
+        self.table.setItem(self.row, 2, QTableWidgetItem(price))
+
+        # Update the database
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        cursor.execute('''
+            UPDATE products SET name = ?, barcode = ?, unit_price = ? WHERE barcode = ?
+        ''', (name, barcode, price, self.table.item(self.row, 1).text()))
+        connection.commit()
+        connection.close()
 
         self.accept()
 
@@ -986,7 +1113,21 @@ class MainWindow(QMainWindow):
 
         self.input1 = QLineEdit()
         self.input1.setPlaceholderText("Input 1")
+        self.input1.textChanged.connect(self.suggestions)
         frame1_layout.addWidget(self.input1, 3)  # Biggest
+
+        self.suggestions_list = QListWidget()
+        self.suggestions_list.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.suggestions_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.suggestions_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.suggestions_list.setStyleSheet("QListWidget { background-color: white; border: 1px solid gray; }")
+        self.suggestions_list.hide()
+        frame1_layout.addWidget(self.suggestions_list)
+        self.suggestions_list.itemClicked.connect(self.select_suggestion)
+
+        self.timer = QTimer()
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.hide_suggestions)
 
         self.input2 = QLineEdit()
         self.input2.setPlaceholderText("Input 2")
@@ -1034,9 +1175,9 @@ class MainWindow(QMainWindow):
         sub_frame2.setFrameShape(QFrame.Shape.NoFrame)
         sub_frame2_layout = QVBoxLayout()
         sub_frame2.setLayout(sub_frame2_layout)
-        popup_menu2 = QComboBox()
-        popup_menu2.addItems(["Option 1", "Option 2", "Option 3", "Option 4"])
-        sub_frame2_layout.addWidget(popup_menu2)
+        self.popup_menu2 = QComboBox()
+        self.popup_menu2.addItems(["Option 1", "Option 2", "Option 3", "Option 4"])
+        sub_frame2_layout.addWidget(self.popup_menu2)
         button1 = QPushButton("Button 1")
         sub_frame2_layout.addWidget(button1)
         button2 = QPushButton("Button 2")
@@ -1046,9 +1187,9 @@ class MainWindow(QMainWindow):
         sub_frame3.setFrameShape(QFrame.Shape.NoFrame)
         sub_frame3_layout = QVBoxLayout()
         sub_frame3.setLayout(sub_frame3_layout)
-        input4 = QLineEdit()
-        input4.setPlaceholderText("Input 4")
-        sub_frame3_layout.addWidget(input4)
+        self.input4 = QLineEdit()
+        self.input4.setPlaceholderText("Input 4")
+        sub_frame3_layout.addWidget(self.input4)
         button3 = QPushButton("Button 3")
         sub_frame3_layout.addWidget(button3)
         button4 = QPushButton("Button 4")
@@ -1058,13 +1199,19 @@ class MainWindow(QMainWindow):
         sub_frame4.setFrameShape(QFrame.Shape.NoFrame)
         sub_frame4_layout = QVBoxLayout()
         sub_frame4.setLayout(sub_frame4_layout)
-        input5 = QLineEdit()
-        input5.setPlaceholderText("Input 5")
-        sub_frame4_layout.addWidget(input5)
+        self.input5 = QLineEdit()
+        self.input5.setPlaceholderText("Input 5")
+        sub_frame4_layout.addWidget(self.input5)
+        self.input6 = QLineEdit()
+        self.input6.setPlaceholderText("Input 6")
+        sub_frame4_layout.addWidget(self.input6)
         button5 = QPushButton("Button 5")
         sub_frame4_layout.addWidget(button5)
-        button6 = QPushButton("Button 6")
-        sub_frame4_layout.addWidget(button6)
+        # button6 = QPushButton("Button 6")
+        # sub_frame4_layout.addWidget(button6)
+        self.input5.textChanged.connect(self.update_change)
+        button1.clicked.connect(self.save_to_database)
+
 
         frame3_sub_layout = QHBoxLayout()
         frame3_layout.addLayout(frame3_sub_layout)
@@ -1082,6 +1229,113 @@ class MainWindow(QMainWindow):
         # Connect the add button to the function
         self.add_button.clicked.connect(self.add_to_table)
 
+    def suggestions(self):
+        text = self.input1.text()
+        if text:
+            connection = sqlite3.connect(DB_PATH)
+            cursor = connection.cursor()
+            cursor.execute('''
+                SELECT name, barcode FROM products
+                WHERE name LIKE ? OR barcode LIKE ?
+            ''', ('%' + text + '%', '%' + text + '%'))
+            suggestions = cursor.fetchall()
+            connection.close()
+
+            self.suggestions_list.clear()
+            for suggestion in suggestions:
+                self.suggestions_list.addItem(f"{suggestion[0]} ({suggestion[1]})")
+
+            self.suggestions_list.show()
+        else:
+            self.suggestions_list.hide()
+
+    def hide_suggestions(self):
+        self.suggestions_list.hide()
+
+    def select_suggestion(self, item):
+        text = item.text()
+        name = text.split(' (')[0]
+        self.input1.setText(name)
+        self.suggestions_list.hide()
+
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        cursor.execute('''
+            SELECT unit_price FROM products
+            WHERE name = ?
+        ''', (name,))
+        price = cursor.fetchone()
+        connection.close()
+
+        if price and price[0] != 0:
+            self.input3.setText(str(price[0]))
+
+    # Add these new methods to update the input fields
+    def update_totals(self):
+        total_sum = 0
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 4)
+            if item:
+                total_sum += float(item.text())
+
+        self.input4.setText(str(total_sum))
+        self.input5.setText(str(total_sum))
+        self.update_change()
+
+    def update_change(self):
+        try:
+            total_sum = float(self.input4.text())
+            paid_amount = float(self.input5.text())
+            change = paid_amount - total_sum
+        except ValueError:
+            change = 0
+
+        self.input6.setText(str(change))
+
+    # Connect update_change to input5 textChanged signal
+
+    # Add the logic to save data to the database when button 1 is clicked
+    def save_to_database(self):
+        products = []
+        for row in range(self.table.rowCount()):
+            product = {
+                "name": self.table.item(row, 0).text(),
+                # "barcode": self.table.item(row, 1).text(),
+                "quantity": float(self.table.item(row, 1).text()),
+                "unit_price": float(self.table.item(row, 2).text()),
+                "total_price": float(self.table.item(row, 4).text())
+            }
+            products.append(product)
+
+        total_amount = float(self.input4.text())
+        amount_paid = float(self.input5.text())
+        change = float(self.input6.text())
+        payment_type = self.popup_menu2.currentText()
+        cash_register_numbers = ""
+
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        cursor.execute('''
+            INSERT INTO documents (products, total_amount, amount_paid, change, payment_type, cash_register_numbers)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (json.dumps(products), total_amount, amount_paid, change, payment_type, cash_register_numbers))
+        connection.commit()
+        connection.close()
+
+        self.table.setRowCount(0)
+        self.input4.clear()
+        self.input5.clear()
+        self.input6.clear()
+
+        msg = QMessageBox()
+        # msg.setIcon(QIcon('add-to-basket.png'))
+        msg.setText("Data saved successfully!")
+        msg.setWindowTitle("Success")
+        msg.exec()
+
+    # Connect save_to_database to button1 clicked signal
+
+    # Update the add_to_table method to calculate the total sum
     def add_to_table(self):
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
@@ -1091,30 +1345,62 @@ class MainWindow(QMainWindow):
         input3_text = self.input3.text()
         popup_text = self.popup_menu1.currentText()
 
-        # Add the input data to the table
         self.table.setItem(row_position, 0, QTableWidgetItem(input1_text))
         self.table.setItem(row_position, 1, QTableWidgetItem(input2_text))
         self.table.setItem(row_position, 2, QTableWidgetItem(input3_text))
         self.table.setItem(row_position, 3, QTableWidgetItem(popup_text))
 
-        # Calculate the multiplication of input2 and input3
         try:
             multiplication_result = float(input2_text) * float(input3_text)
         except ValueError:
-            multiplication_result = "Error"
+            multiplication_result = 0
         self.table.setItem(row_position, 4, QTableWidgetItem(str(multiplication_result)))
 
-        # Add a delete button with trash icon
         delete_button = QPushButton()
         delete_button.setIcon(QIcon('trash_icon.png'))
         delete_button.clicked.connect(lambda: self.remove_row(row_position))
         self.table.setCellWidget(row_position, 5, delete_button)
 
-        # Clear the inputs after adding to the table
         self.input1.clear()
         self.input2.clear()
         self.input3.clear()
         self.popup_menu1.setCurrentIndex(0)
+
+        self.update_totals()
+
+    # def add_to_table(self):
+    #     row_position = self.table.rowCount()
+    #     self.table.insertRow(row_position)
+    #
+    #     input1_text = self.input1.text()
+    #     input2_text = self.input2.text()
+    #     input3_text = self.input3.text()
+    #     popup_text = self.popup_menu1.currentText()
+    #
+    #     # Add the input data to the table
+    #     self.table.setItem(row_position, 0, QTableWidgetItem(input1_text))
+    #     self.table.setItem(row_position, 1, QTableWidgetItem(input2_text))
+    #     self.table.setItem(row_position, 2, QTableWidgetItem(input3_text))
+    #     self.table.setItem(row_position, 3, QTableWidgetItem(popup_text))
+    #
+    #     # Calculate the multiplication of input2 and input3
+    #     try:
+    #         multiplication_result = float(input2_text) * float(input3_text)
+    #     except ValueError:
+    #         multiplication_result = "Error"
+    #     self.table.setItem(row_position, 4, QTableWidgetItem(str(multiplication_result)))
+    #
+    #     # Add a delete button with trash icon
+    #     delete_button = QPushButton()
+    #     delete_button.setIcon(QIcon('trash_icon.png'))
+    #     delete_button.clicked.connect(lambda: self.remove_row(row_position))
+    #     self.table.setCellWidget(row_position, 5, delete_button)
+    #
+    #     # Clear the inputs after adding to the table
+    #     self.input1.clear()
+    #     self.input2.clear()
+    #     self.input3.clear()
+    #     self.popup_menu1.setCurrentIndex(0)
 
     def remove_row(self, row):
         self.table.removeRow(row)
@@ -1131,7 +1417,6 @@ class MainWindow(QMainWindow):
         self.spravki_clients_window = SpravkiClientsWindow()
         self.spravki_clients_window.exec()
 
-
     def open_spravki_sales_window(self):
         self.spravki_sales_window = SpravkiSalesWindow()
         self.spravki_sales_window.exec()
@@ -1147,6 +1432,9 @@ class MainWindow(QMainWindow):
     def open_new_window(self):
         self.new_window = ProductsWindow()
         self.new_window.exec()
+
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
