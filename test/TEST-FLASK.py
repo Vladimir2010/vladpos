@@ -427,36 +427,24 @@
 #     sys.exit(app.exec())
 import sys
 import os
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QFrame, QVBoxLayout, QHBoxLayout, QWidget, QMenu,
-    QSizePolicy, QLabel, QLineEdit, QPushButton, QComboBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QDialog, QDialogButtonBox, QCalendarWidget, QTextEdit
-)
-from PyQt6.QtGui import QIcon, QAction, QPixmap
-from PyQt6.QtCore import Qt
-import sqlite3
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QFrame, QVBoxLayout, QHBoxLayout, QWidget, QMenu,
-    QSizePolicy, QLabel, QLineEdit, QPushButton, QComboBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QDialog, QDialogButtonBox, QCalendarWidget, QTextEdit, QListWidget
-)
-from PyQt6.QtGui import QIcon, QAction, QPixmap
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QFrame, QVBoxLayout, QHBoxLayout, QWidget, QMenu,
-    QLabel, QLineEdit, QPushButton, QComboBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QListWidget, QAbstractItemView
-)
-from PyQt6.QtGui import QIcon, QAction, QPixmap
-from PyQt6.QtCore import Qt, QTimer
 import sqlite3
 import json
-from PyQt6.QtWidgets import QMessageBox
-
+from openpyxl import Workbook, load_workbook
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QIcon, QAction, QPixmap
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QFrame, QVBoxLayout, QHBoxLayout, QWidget, QMenu,
+    QSizePolicy, QLabel, QLineEdit, QPushButton, QComboBox, QTableWidget, QTableWidgetItem,
+    QHeaderView, QDialog, QDialogButtonBox, QCalendarWidget, QTextEdit, QListWidget,
+    QFileDialog, QAbstractItemView, QMessageBox, QTabWidget
+)
+from customer_window import CustomersWindow
+from documents_window import DocumentsWindow
+from invoices_window import InvoicesWindow
 
 DB_DIR = "database"
 # Функция за създаване на база данни и таблици
-DB_PATH = "database/pos_syste.db"
+DB_PATH = "database/pos_system.db"
 
 def create_database():
     if not os.path.exists(DB_DIR):
@@ -468,64 +456,76 @@ def create_database():
     connection = sqlite3.connect(DB_PATH)
     cursor = connection.cursor()
 
-    # Table with customers for invoices
+    # Create products table
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS customers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        bulstat TEXT NOT NULL,
-        bulstat_vat TEXT,
-        address TEXT NOT NULL,
-        mol TEXT NOT NULL,
-        phone TEXT NOT NULL
-    )
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            barcode TEXT NOT NULL,
+            unit_price REAL NOT NULL
+        )
     ''')
 
-    # Table with each document
+    # Create customers table
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS documents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        products TEXT, -- JSON format: [{"name": "product1", "barcode": "123", "quantity": 2, "unit_price": 10.0}, ...]
-        total_amount REAL NOT NULL,
-        amount_paid REAL NOT NULL,
-        change REAL NOT NULL,
-        payment_type TEXT NOT NULL,
-        cash_register_numbers TEXT NOT NULL
-    )
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            eik TEXT NOT NULL,
+            dds TEXT NOT NULL,
+            address TEXT NOT NULL,
+            mol TEXT NOT NULL,
+            phone TEXT NOT NULL
+        )
     ''')
 
-    # Table with products
+    # Create firm table
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        barcode TEXT NOT NULL,
-        unit_price REAL NOT NULL
-    )
+        CREATE TABLE IF NOT EXISTS firm (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            eik TEXT NOT NULL,
+            dds TEXT NOT NULL,
+            address TEXT NOT NULL,
+            mol TEXT NOT NULL,
+            phone TEXT NOT NULL
+        )
+    ''')
+
+    # Create documents table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+            id INTEGER PRIMARY KEY,
+            products TEXT NOT NULL,  -- JSON format
+            total_amount REAL NOT NULL,
+            amount_paid REAL NOT NULL,
+            change REAL NOT NULL,
+            payment_type TEXT NOT NULL,
+            cash_register_numbers TEXT
+        )
+    ''')
+
+    # Create invoices table with foreign keys referencing customers and firm
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS invoices (
+            number INTEGER PRIMARY KEY,
+            customer_ref_no INTEGER NOT NULL,
+            selling_company_ref_no INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            products TEXT NOT NULL,  -- JSON format
+            total_amount REAL NOT NULL,
+            amount_paid REAL NOT NULL,
+            change REAL NOT NULL,
+            payment_type TEXT NOT NULL,
+            FOREIGN KEY (customer_ref_no) REFERENCES customers(id),
+            FOREIGN KEY (selling_company_ref_no) REFERENCES firm(id)
+        )
     ''')
 
     connection.commit()
     connection.close()
 
 create_database()
-
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QPushButton, QComboBox, QLineEdit
-
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QPushButton,
-    QComboBox, QLineEdit
-)
-
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QPushButton,
-    QComboBox, QLineEdit, QFrame
-)
-import sqlite3
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QPushButton,
-    QComboBox, QLineEdit, QFrame, QFileDialog
-)
-from openpyxl import Workbook, load_workbook
 
 class ProductsWindow(QDialog):
     def __init__(self):
@@ -588,20 +588,28 @@ class ProductsWindow(QDialog):
         second_layout.addLayout(combo_layout)
 
         # Third Frame
-        third_frame = QFrame()
-        third_layout = QVBoxLayout()
-        third_frame.setLayout(third_layout)
 
-        for i in range(3):
-            label = QLabel(f"Label {i + 1}")
-            input = QLineEdit()
-            third_layout.addWidget(label)
-            third_layout.addWidget(input)
+        # Add these lines in the __init__ method to create filter inputs
+        self.filter_frame = QFrame()
+        self.filter_layout = QHBoxLayout()
+        self.filter_frame.setLayout(self.filter_layout)
+        self.filter_name_input = QLineEdit()
+        self.filter_name_input.setPlaceholderText("Filter by Name")
+        self.filter_name_input.textChanged.connect(self.filter_products)
+        self.filter_layout.addWidget(self.filter_name_input)
+        self.filter_barcode_input = QLineEdit()
+        self.filter_barcode_input.setPlaceholderText("Filter by Barcode")
+        self.filter_barcode_input.textChanged.connect(self.filter_products)
+        self.filter_layout.addWidget(self.filter_barcode_input)
+        first_layout.addWidget(self.filter_frame)
+
 
         # Add frames to main layout
         main_layout.addWidget(first_frame)
         main_layout.addWidget(second_frame)
-        main_layout.addWidget(third_frame)
+        main_layout.addWidget(self.filter_frame)
+
+
 
         self.setLayout(main_layout)
 
@@ -685,6 +693,18 @@ class ProductsWindow(QDialog):
             connection.commit()
             connection.close()
 
+    # Add this method to filter the products table
+    def filter_products(self):
+        name_filter = self.filter_name_input.text().lower()
+        barcode_filter = self.filter_barcode_input.text().lower()
+
+        for row in range(self.table.rowCount()):
+            name_item = self.table.item(row, 0)
+            barcode_item = self.table.item(row, 1)
+            name_match = name_filter in name_item.text().lower() if name_item else False
+            barcode_match = barcode_filter in barcode_item.text().lower() if barcode_item else False
+            self.table.setRowHidden(row, not (name_match and barcode_match))
+
 class AddProductWindow(QDialog):
     def __init__(self, table):
         super().__init__()
@@ -733,7 +753,6 @@ class AddProductWindow(QDialog):
         connection.close()
 
         self.accept()
-
 
 class EditProductWindow(QDialog):
     def __init__(self, table, row):
@@ -932,12 +951,95 @@ class SpravkiSalesWindow(QDialog):
         layout.addWidget(button_box)
         self.setLayout(layout)
 
+# class SettingsWindow(QDialog):
+#     def __init__(self):
+#         super().__init__()
+#         self.setWindowTitle("Settings")
+#         self.setGeometry(100, 100, 400, 300)
+#         main_layout = QVBoxLayout()
+#
+#         # First Frame
+#         first_frame = QFrame()
+#         first_frame.setFrameShape(QFrame.Shape.NoFrame)
+#         first_layout = QVBoxLayout()
+#         first_frame.setLayout(first_layout)
+#
+#         first_title = QLabel("First Title")
+#         first_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+#         first_layout.addWidget(first_title)
+#
+#         for i in range(4):
+#             row_layout = QHBoxLayout()
+#             label = QLabel(f"Label {i + 1}:")
+#             input = QComboBox()
+#             input.addItems([f"Option {j + 1}" for j in range(3)])
+#             row_layout.addWidget(label)
+#             row_layout.addWidget(input)
+#             first_layout.addLayout(row_layout)
+#
+#         # Second Frame
+#         second_frame = QFrame()
+#         second_frame.setFrameShape(QFrame.Shape.NoFrame)
+#         second_layout = QVBoxLayout()
+#         second_frame.setLayout(second_layout)
+#
+#         second_title = QLabel("Second Title")
+#         second_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+#         second_layout.addWidget(second_title)
+#
+#         for i in range(2):
+#             row_layout = QHBoxLayout()
+#             label = QLabel(f"Label {i + 1}:")
+#             input = QLineEdit()
+#             row_layout.addWidget(label)
+#             row_layout.addWidget(input)
+#             second_layout.addLayout(row_layout)
+#
+#         # Third Frame
+#         third_frame = QFrame()
+#         third_frame.setFrameShape(QFrame.Shape.NoFrame)
+#         third_layout = QVBoxLayout()
+#         third_frame.setLayout(third_layout)
+#
+#         third_title = QLabel("Third Title")
+#         third_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+#         third_layout.addWidget(third_title)
+#
+#         for i in range(5):
+#             row_layout = QHBoxLayout()
+#             label = QLabel(f"Label {i + 1}:")
+#             input = QComboBox()
+#             input.addItems([f"Option {j + 1}" for j in range(3)])
+#             row_layout.addWidget(label)
+#             row_layout.addWidget(input)
+#             third_layout.addLayout(row_layout)
+#
+#         # Add frames to main layout
+#         main_layout.addWidget(first_frame)
+#         main_layout.addWidget(second_frame)
+#         main_layout.addWidget(third_frame)
+#
+#         self.setLayout(main_layout)
+
 class SettingsWindow(QDialog):
-    def __init__(self):
+    def __init__(self, main_window):
         super().__init__()
-        self.setWindowTitle("Settings")
-        self.setGeometry(100, 100, 400, 300)
+        self.setWindowTitle("Settings Window")
+        self.setGeometry(100, 100, 600, 400)
+        self.main_window = main_window
+
+
         main_layout = QVBoxLayout()
+
+        # Create a QTabWidget
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
+
+        # Add the first tab
+        self.tab1 = QWidget()
+        self.tabs.addTab(self.tab1, "General Settings")
+        self.tab1_layout = QVBoxLayout()
+        self.tab1.setLayout(self.tab1_layout)
 
         # First Frame
         first_frame = QFrame()
@@ -968,13 +1070,16 @@ class SettingsWindow(QDialog):
         second_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         second_layout.addWidget(second_title)
 
-        for i in range(2):
-            row_layout = QHBoxLayout()
-            label = QLabel(f"Label {i + 1}:")
-            input = QLineEdit()
-            row_layout.addWidget(label)
-            row_layout.addWidget(input)
-            second_layout.addLayout(row_layout)
+        self.operator_name_input = QLineEdit()
+        self.operator_number_input = QLineEdit()
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(self.save_settings)
+
+        second_layout.addWidget(QLabel("Operator Name"))
+        second_layout.addWidget(self.operator_name_input)
+        second_layout.addWidget(QLabel("Operator Number"))
+        second_layout.addWidget(self.operator_number_input)
+        second_layout.addWidget(save_button)
 
         # Third Frame
         third_frame = QFrame()
@@ -995,12 +1100,106 @@ class SettingsWindow(QDialog):
             row_layout.addWidget(input)
             third_layout.addLayout(row_layout)
 
-        # Add frames to main layout
-        main_layout.addWidget(first_frame)
-        main_layout.addWidget(second_frame)
-        main_layout.addWidget(third_frame)
+        # Add frames to the first tab layout
+        self.tab1_layout.addWidget(first_frame)
+        self.tab1_layout.addWidget(second_frame)
+        self.tab1_layout.addWidget(third_frame)
+
+        # Add the second tab
+        self.tab2 = QWidget()
+        self.tabs.addTab(self.tab2, "Add Firm")
+        self.tab2_layout = QVBoxLayout()
+        self.tab2.setLayout(self.tab2_layout)
+
+        # Add labels and inputs to the second tab
+        self.firm_name_label = QLabel("Firm Name:")
+        self.firm_name_input = QLineEdit()
+        self.tab2_layout.addWidget(self.firm_name_label)
+        self.tab2_layout.addWidget(self.firm_name_input)
+
+        self.firm_eik_label = QLabel("EIK:")
+        self.firm_eik_input = QLineEdit()
+        self.tab2_layout.addWidget(self.firm_eik_label)
+        self.tab2_layout.addWidget(self.firm_eik_input)
+
+        self.firm_dds_label = QLabel("DDS:")
+        self.firm_dds_input = QLineEdit()
+        self.tab2_layout.addWidget(self.firm_dds_label)
+        self.tab2_layout.addWidget(self.firm_dds_input)
+
+        self.firm_address_label = QLabel("Address:")
+        self.firm_address_input = QLineEdit()
+        self.tab2_layout.addWidget(self.firm_address_label)
+        self.tab2_layout.addWidget(self.firm_address_input)
+
+        self.firm_mol_label = QLabel("MOL:")
+        self.firm_mol_input = QLineEdit()
+        self.tab2_layout.addWidget(self.firm_mol_label)
+        self.tab2_layout.addWidget(self.firm_mol_input)
+
+        self.firm_phone_label = QLabel("Phone:")
+        self.firm_phone_input = QLineEdit()
+        self.tab2_layout.addWidget(self.firm_phone_label)
+        self.tab2_layout.addWidget(self.firm_phone_input)
+
+        self.add_firm_button = QPushButton("Add Firm")
+        self.add_firm_button.clicked.connect(self.add_firm)
+        self.tab2_layout.addWidget(self.add_firm_button)
 
         self.setLayout(main_layout)
+    #
+    # def save_settings(self):
+    #     # Implement the code to save the general settings
+    #     setting1 = self.setting1_input.text()
+    #     setting2 = self.setting2_input.text()
+    #     print(f"Saved General Settings: {setting1}, {setting2}")
+
+    def save_additional_settings(self):
+        # Implement the code to save the additional settings
+        additional_setting1 = self.additional_setting1_input.text()
+        additional_setting2 = self.additional_setting2_input.text()
+        print(f"Saved Additional Settings: {additional_setting1}, {additional_setting2}")
+
+    def save_settings(self):
+        operator_name = self.operator_name_input.text()
+        operator_number = self.operator_number_input.text()
+        if operator_name and operator_number:
+            connection = sqlite3.connect(DB_PATH)
+            cursor = connection.cursor()
+            cursor.execute('''
+                INSERT INTO settings (operator_name, operator_number)
+                VALUES (?, ?)
+            ''', (operator_name, operator_number))
+            connection.commit()
+            connection.close()
+            self.main_window.update_operator_label(f"{operator_name} - {operator_number}")
+            self.accept()
+
+    def add_firm(self):
+        # Implement the code to add a firm
+        firm_name = self.firm_name_input.text()
+        firm_eik = self.firm_eik_input.text()
+        firm_dds = self.firm_dds_input.text()
+        firm_address = self.firm_address_input.text()
+        firm_mol = self.firm_mol_input.text()
+        firm_phone = self.firm_phone_input.text()
+
+        connection = sqlite3.connect(DB_PATH)
+        cursor = connection.cursor()
+        cursor.execute('''
+            INSERT INTO firm (name, eik, dds, address, mol, phone)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (firm_name, firm_eik, firm_dds, firm_address, firm_mol, firm_phone))
+        connection.commit()
+        connection.close()
+
+        print(f"Added Firm: {firm_name}, {firm_eik}, {firm_dds}, {firm_address}, {firm_mol}, {firm_phone}")
+        self.firm_name_input.clear()
+        self.firm_eik_input.clear()
+        self.firm_dds_input.clear()
+        self.firm_address_input.clear()
+        self.firm_mol_input.clear()
+        self.firm_phone_input.clear()
 
 class HelpWindow(QDialog):
     def __init__(self):
@@ -1091,6 +1290,30 @@ class MainWindow(QMainWindow):
 
         menubar.addMenu(new_menu)
 
+        # Add the following code in the menubar section to create the Customers menu
+        customers_menu = QMenu("Customers", self)
+        customers_menu.setIcon(QIcon('user-2.png'))
+        customers_action = QAction(QIcon('customer_action_icon.png'), 'Open Customers Window', self)
+        customers_action.triggered.connect(self.open_customers_window)
+        customers_menu.addAction(customers_action)
+        menubar.addMenu(customers_menu)
+
+        # Add the following code in the menubar section to create the Documents menu
+        documents_menu = QMenu("Documents", self)
+        documents_menu.setIcon(QIcon('paper.png'))
+        documents_action = QAction(QIcon('document_action_icon.png'), 'Open Documents Window', self)
+        documents_action.triggered.connect(self.open_documents_window)
+        documents_menu.addAction(documents_action)
+        menubar.addMenu(documents_menu)
+
+        # Add the following code in the menubar section to create the Invoices menu
+        invoices_menu = QMenu("Invoices", self)
+        invoices_menu.setIcon(QIcon('invoice.png'))
+        invoices_action = QAction(QIcon('invoice.png'), 'Open Invoices Window', self)
+        invoices_action.triggered.connect(self.open_invoices_window)
+        invoices_menu.addAction(invoices_action)
+        menubar.addMenu(invoices_menu)
+
         # Create Settings menu
         settings_menu = QMenu("Settings", self)
         settings_menu.setIcon(QIcon('setting.png'))
@@ -1167,9 +1390,9 @@ class MainWindow(QMainWindow):
         image_label.setScaledContents(True)  # Scale the image to fit the label
         image_label.setMaximumSize(100,100)  # Set maximum size for the image label
         sub_frame1_layout.addWidget(image_label, alignment=Qt.AlignmentFlag.AlignCenter)
-        image_text_label = QLabel("Image Label")
-        image_text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center the text under the image
-        sub_frame1_layout.addWidget(image_text_label)
+        self.image_text_label = QLabel("Image Label")
+        self.image_text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center the text under the image
+        sub_frame1_layout.addWidget(self.image_text_label)
 
         sub_frame2 = QFrame()
         sub_frame2.setFrameShape(QFrame.Shape.NoFrame)
@@ -1252,6 +1475,9 @@ class MainWindow(QMainWindow):
     def hide_suggestions(self):
         self.suggestions_list.hide()
 
+    def update_operator_label(self, text):
+        self.image_text_label.setText(text)
+
     def select_suggestion(self, item):
         text = item.text()
         name = text.split(' (')[0]
@@ -1270,7 +1496,6 @@ class MainWindow(QMainWindow):
         if price and price[0] != 0:
             self.input3.setText(str(price[0]))
 
-    # Add these new methods to update the input fields
     def update_totals(self):
         total_sum = 0
         for row in range(self.table.rowCount()):
@@ -1292,9 +1517,6 @@ class MainWindow(QMainWindow):
 
         self.input6.setText(str(change))
 
-    # Connect update_change to input5 textChanged signal
-
-    # Add the logic to save data to the database when button 1 is clicked
     def save_to_database(self):
         products = []
         for row in range(self.table.rowCount()):
@@ -1333,9 +1555,6 @@ class MainWindow(QMainWindow):
         msg.setWindowTitle("Success")
         msg.exec()
 
-    # Connect save_to_database to button1 clicked signal
-
-    # Update the add_to_table method to calculate the total sum
     def add_to_table(self):
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
@@ -1368,40 +1587,6 @@ class MainWindow(QMainWindow):
 
         self.update_totals()
 
-    # def add_to_table(self):
-    #     row_position = self.table.rowCount()
-    #     self.table.insertRow(row_position)
-    #
-    #     input1_text = self.input1.text()
-    #     input2_text = self.input2.text()
-    #     input3_text = self.input3.text()
-    #     popup_text = self.popup_menu1.currentText()
-    #
-    #     # Add the input data to the table
-    #     self.table.setItem(row_position, 0, QTableWidgetItem(input1_text))
-    #     self.table.setItem(row_position, 1, QTableWidgetItem(input2_text))
-    #     self.table.setItem(row_position, 2, QTableWidgetItem(input3_text))
-    #     self.table.setItem(row_position, 3, QTableWidgetItem(popup_text))
-    #
-    #     # Calculate the multiplication of input2 and input3
-    #     try:
-    #         multiplication_result = float(input2_text) * float(input3_text)
-    #     except ValueError:
-    #         multiplication_result = "Error"
-    #     self.table.setItem(row_position, 4, QTableWidgetItem(str(multiplication_result)))
-    #
-    #     # Add a delete button with trash icon
-    #     delete_button = QPushButton()
-    #     delete_button.setIcon(QIcon('trash_icon.png'))
-    #     delete_button.clicked.connect(lambda: self.remove_row(row_position))
-    #     self.table.setCellWidget(row_position, 5, delete_button)
-    #
-    #     # Clear the inputs after adding to the table
-    #     self.input1.clear()
-    #     self.input2.clear()
-    #     self.input3.clear()
-    #     self.popup_menu1.setCurrentIndex(0)
-
     def remove_row(self, row):
         self.table.removeRow(row)
 
@@ -1422,7 +1607,7 @@ class MainWindow(QMainWindow):
         self.spravki_sales_window.exec()
 
     def open_settings_window(self):
-        self.settings_window = SettingsWindow()
+        self.settings_window = SettingsWindow(self)
         self.settings_window.exec()
 
     def open_help_window(self):
@@ -1433,6 +1618,17 @@ class MainWindow(QMainWindow):
         self.new_window = ProductsWindow()
         self.new_window.exec()
 
+    def open_customers_window(self):
+        self.customers_window = CustomersWindow()
+        self.customers_window.exec()
+
+    def open_documents_window(self):
+        self.documents_window = DocumentsWindow()
+        self.documents_window.exec()
+
+    def open_invoices_window(self):
+        self.invoices_window = InvoicesWindow()
+        self.invoices_window.exec()
 
 
 if __name__ == "__main__":
