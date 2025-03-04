@@ -6,12 +6,13 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from openpyxl import Workbook, load_workbook
 
+DB_DIR = "database"
 DB_PATH = "database/pos_system.db"
 
 class CustomersWindow(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Customers Window")
+        self.setWindowTitle("Контрагенти")
         self.setGeometry(100, 100, 600, 400)
 
         main_layout = QVBoxLayout()
@@ -22,7 +23,7 @@ class CustomersWindow(QDialog):
 
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["Name of Firm", "EIK", "DDS", "Address", "MOL", "Phone"])
+        self.table.setHorizontalHeaderLabels(["Име на фирма", "Булстат", "ДДС Номер", "Адрес", "МОЛ", "Тел. Номер"])
         first_layout.addWidget(self.table)
 
         self.load_customers()
@@ -32,27 +33,27 @@ class CustomersWindow(QDialog):
         second_frame.setLayout(second_layout)
 
         buttons_layout = QHBoxLayout()
-        self.add_button = QPushButton("Add New Customer")
+        self.add_button = QPushButton("Нов")
         self.add_button.clicked.connect(self.open_add_customer_window)
         buttons_layout.addWidget(self.add_button)
 
-        self.edit_button = QPushButton("Edit Customer")
+        self.edit_button = QPushButton("Редактирай")
         self.edit_button.clicked.connect(self.open_edit_customer_window)
         buttons_layout.addWidget(self.edit_button)
 
-        self.delete_button = QPushButton("Delete Customer")
+        self.delete_button = QPushButton("Изтрий")
         self.delete_button.clicked.connect(self.delete_customer)
         buttons_layout.addWidget(self.delete_button)
 
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("Обнови")
         self.refresh_button.clicked.connect(self.load_customers)
         buttons_layout.addWidget(self.refresh_button)
 
-        self.export_button = QPushButton("Export to XLSX")
+        self.export_button = QPushButton("Експортиране в XLSX")
         self.export_button.clicked.connect(self.export_to_xlsx)
         buttons_layout.addWidget(self.export_button)
 
-        self.import_button = QPushButton("Import from XLSX")
+        self.import_button = QPushButton("Импортиране от XLSX")
         self.import_button.clicked.connect(self.import_from_xlsx)
         buttons_layout.addWidget(self.import_button)
 
@@ -64,17 +65,17 @@ class CustomersWindow(QDialog):
         self.filter_frame.setLayout(self.filter_layout)
 
         self.filter_name_input = QLineEdit()
-        self.filter_name_input.setPlaceholderText("Filter by Name")
+        self.filter_name_input.setPlaceholderText("Филтър по Име на фирма")
         self.filter_name_input.textChanged.connect(self.filter_customers)
         self.filter_layout.addWidget(self.filter_name_input)
 
         self.filter_eik_input = QLineEdit()
-        self.filter_eik_input.setPlaceholderText("Filter by EIK")
+        self.filter_eik_input.setPlaceholderText("Филтър по Булстат")
         self.filter_eik_input.textChanged.connect(self.filter_customers)
         self.filter_layout.addWidget(self.filter_eik_input)
 
         self.filter_phone_input = QLineEdit()
-        self.filter_phone_input.setPlaceholderText("Filter by Phone")
+        self.filter_phone_input.setPlaceholderText("Филтър по Тел. Номер")
         self.filter_phone_input.textChanged.connect(self.filter_customers)
         self.filter_layout.addWidget(self.filter_phone_input)
 
@@ -129,9 +130,9 @@ class CustomersWindow(QDialog):
         if file_path:
             workbook = Workbook()
             sheet = workbook.active
-            sheet.title = "Customers"
+            sheet.title = "Контрагенти"
 
-            headers = ["Name of Firm", "EIK", "DDS", "Address", "MOL", "Phone"]
+            headers = ["Име нафирма", "Булстат", "ДДС Номер", "Адрес", "МОЛ", "Тел. номер"]
             sheet.append(headers)
 
             for row in range(self.table.rowCount()):
@@ -185,7 +186,7 @@ class CustomersWindow(QDialog):
 class AddCustomerWindow(QDialog):
     def __init__(self, table):
         super().__init__()
-        self.setWindowTitle("Add Customer")
+        self.setWindowTitle("Нов контрагент")
         self.setGeometry(100, 100, 300, 300)
         self.table = table
 
@@ -198,20 +199,20 @@ class AddCustomerWindow(QDialog):
         self.mol_input = QLineEdit()
         self.phone_input = QLineEdit()
 
-        layout.addWidget(QLabel("Name of Firm"))
+        layout.addWidget(QLabel("Име на фирма"))
         layout.addWidget(self.name_input)
-        layout.addWidget(QLabel("EIK"))
+        layout.addWidget(QLabel("Булстат"))
         layout.addWidget(self.eik_input)
-        layout.addWidget(QLabel("DDS"))
+        layout.addWidget(QLabel("ДДС номер"))
         layout.addWidget(self.dds_input)
-        layout.addWidget(QLabel("Address"))
+        layout.addWidget(QLabel("Адрес"))
         layout.addWidget(self.address_input)
-        layout.addWidget(QLabel("MOL"))
+        layout.addWidget(QLabel("МОЛ"))
         layout.addWidget(self.mol_input)
-        layout.addWidget(QLabel("Phone"))
+        layout.addWidget(QLabel("Тел. номер"))
         layout.addWidget(self.phone_input)
 
-        add_button = QPushButton("Add")
+        add_button = QPushButton("Добави")
         add_button.clicked.connect(self.add_customer)
         layout.addWidget(add_button)
 
@@ -247,7 +248,7 @@ class AddCustomerWindow(QDialog):
 class EditCustomerWindow(QDialog):
     def __init__(self, table, row):
         super().__init__()
-        self.setWindowTitle("Edit Customer")
+        self.setWindowTitle("Редактиране на контрагент")
         self.setGeometry(100, 100, 300, 300)
         self.table = table
         self.row = row
@@ -261,22 +262,22 @@ class EditCustomerWindow(QDialog):
         self.mol_input = QLineEdit()
         self.phone_input = QLineEdit()
 
-        layout.addWidget(QLabel("Name of Firm"))
+        layout.addWidget(QLabel("Име на фирма"))
         layout.addWidget(self.name_input)
-        layout.addWidget(QLabel("EIK"))
+        layout.addWidget(QLabel("Булстат"))
         layout.addWidget(self.eik_input)
-        layout.addWidget(QLabel("DDS"))
+        layout.addWidget(QLabel("ДДС номер"))
         layout.addWidget(self.dds_input)
-        layout.addWidget(QLabel("Address"))
+        layout.addWidget(QLabel("Адрес"))
         layout.addWidget(self.address_input)
-        layout.addWidget(QLabel("MOL"))
+        layout.addWidget(QLabel("МОЛ"))
         layout.addWidget(self.mol_input)
-        layout.addWidget(QLabel("Phone"))
+        layout.addWidget(QLabel("Тел. номер"))
         layout.addWidget(self.phone_input)
 
         self.load_customer()
 
-        edit_button = QPushButton("Edit")
+        edit_button = QPushButton("Запазване")
         edit_button.clicked.connect(self.edit_customer)
         layout.addWidget(edit_button)
 

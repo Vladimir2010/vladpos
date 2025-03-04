@@ -8,11 +8,10 @@ from openpyxl import Workbook, load_workbook
 
 DB_PATH = "database/pos_system.db"
 
-
 class DocumentsWindow(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Documents Window")
+        self.setWindowTitle("Продажби")
         self.setGeometry(100, 100, 800, 600)
 
         main_layout = QVBoxLayout()
@@ -24,7 +23,7 @@ class DocumentsWindow(QDialog):
         self.table = QTableWidget()
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Products", "Total Amount", "Amount Paid", "Change", "Payment Type", "Cash Register Numbers"])
+            ["ID", "Продукти", "Обща сума", "Платено", "Ресто", "Метод на плащане", "Серийни номера на касовия апарат"])
         first_layout.addWidget(self.table)
 
         self.load_documents()
@@ -35,23 +34,23 @@ class DocumentsWindow(QDialog):
 
         buttons_layout = QHBoxLayout()
 
-        self.edit_button = QPushButton("Edit Document")
+        self.edit_button = QPushButton("Редактирай продажба")
         self.edit_button.clicked.connect(self.open_edit_document_window)
         buttons_layout.addWidget(self.edit_button)
 
-        self.delete_button = QPushButton("Delete Document")
+        self.delete_button = QPushButton("Изтрий продажба")
         self.delete_button.clicked.connect(self.delete_document)
         buttons_layout.addWidget(self.delete_button)
 
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("Обнови")
         self.refresh_button.clicked.connect(self.load_documents)
         buttons_layout.addWidget(self.refresh_button)
 
-        self.export_button = QPushButton("Export to XLSX")
+        self.export_button = QPushButton("Експортиране в XLSX")
         self.export_button.clicked.connect(self.export_to_xlsx)
         buttons_layout.addWidget(self.export_button)
 
-        self.import_button = QPushButton("Import from XLSX")
+        self.import_button = QPushButton("Импортиране от XLSX")
         self.import_button.clicked.connect(self.import_from_xlsx)
         buttons_layout.addWidget(self.import_button)
 
@@ -63,12 +62,12 @@ class DocumentsWindow(QDialog):
         self.filter_frame.setLayout(self.filter_layout)
 
         self.filter_products_input = QLineEdit()
-        self.filter_products_input.setPlaceholderText("Filter by Products")
+        self.filter_products_input.setPlaceholderText("Филтър по продукти")
         self.filter_products_input.textChanged.connect(self.filter_documents)
         self.filter_layout.addWidget(self.filter_products_input)
 
         self.filter_id_input = QLineEdit()
-        self.filter_id_input.setPlaceholderText("Filter by ID")
+        self.filter_id_input.setPlaceholderText("Филтър по ID")
         self.filter_id_input.textChanged.connect(self.filter_documents)
         self.filter_layout.addWidget(self.filter_id_input)
 
@@ -123,8 +122,8 @@ class DocumentsWindow(QDialog):
             sheet = workbook.active
             sheet.title = "Documents"
 
-            headers = ["ID", "Products", "Total Amount", "Amount Paid", "Change", "Payment Type",
-                       "Cash Register Numbers"]
+            headers = ["ID", "Продукти", "Обща сума", "Платено", "Ресто", "Метод на плащане",
+                       "Серийни номера на касовия апарат"]
             sheet.append(headers)
 
             for row in range(self.table.rowCount()):
@@ -172,11 +171,10 @@ class DocumentsWindow(QDialog):
             id_match = id_filter in id_item.text().lower() if id_item else False
             self.table.setRowHidden(row, not (products_match and id_match))
 
-
 class EditDocumentWindow(QDialog):
     def __init__(self, table, row):
         super().__init__()
-        self.setWindowTitle("Edit Document")
+        self.setWindowTitle("Редактиране на продажба")
         self.setGeometry(100, 100, 400, 400)
         self.table = table
         self.row = row
@@ -193,22 +191,22 @@ class EditDocumentWindow(QDialog):
 
         layout.addWidget(QLabel("ID"))
         layout.addWidget(self.id_input)
-        layout.addWidget(QLabel("Products"))
+        layout.addWidget(QLabel("Продукти"))
         layout.addWidget(self.products_input)
-        layout.addWidget(QLabel("Total Amount"))
+        layout.addWidget(QLabel("Обща сума"))
         layout.addWidget(self.total_amount_input)
-        layout.addWidget(QLabel("Amount Paid"))
+        layout.addWidget(QLabel("Платено"))
         layout.addWidget(self.amount_paid_input)
-        layout.addWidget(QLabel("Change"))
+        layout.addWidget(QLabel("Ресто"))
         layout.addWidget(self.change_input)
-        layout.addWidget(QLabel("Payment Type"))
+        layout.addWidget(QLabel("Метод на плащане"))
         layout.addWidget(self.payment_type_input)
-        layout.addWidget(QLabel("Cash Register Numbers"))
+        layout.addWidget(QLabel("Серийни номера на касовия апарат"))
         layout.addWidget(self.cash_register_numbers_input)
 
         self.load_document()
 
-        edit_button = QPushButton("Edit")
+        edit_button = QPushButton("Запазване")
         edit_button.clicked.connect(self.edit_document)
         layout.addWidget(edit_button)
 

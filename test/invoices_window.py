@@ -8,11 +8,10 @@ from openpyxl import Workbook, load_workbook
 
 DB_PATH = "database/pos_system.db"
 
-
 class InvoicesWindow(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Invoices Window")
+        self.setWindowTitle("Фактури")
         self.setGeometry(100, 100, 800, 600)
 
         main_layout = QVBoxLayout()
@@ -24,8 +23,8 @@ class InvoicesWindow(QDialog):
         self.table = QTableWidget()
         self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels([
-            "Number", "Customer Ref No", "Selling Company Ref No", "Date", "Products",
-            "Total Amount", "Amount Paid", "Change", "Payment Type"
+            "Номер", "Контрагент No", "Продавач No", "Дата", "Продукти",
+            "Обща сума", "Платено", "Ресто", "Метод на плащане"
         ])
         first_layout.addWidget(self.table)
 
@@ -37,27 +36,27 @@ class InvoicesWindow(QDialog):
 
         buttons_layout = QHBoxLayout()
 
-        self.add_button = QPushButton("Add New Invoice")
+        self.add_button = QPushButton("Нова")
         self.add_button.clicked.connect(self.open_add_invoice_window)
         buttons_layout.addWidget(self.add_button)
 
-        self.edit_button = QPushButton("Edit Invoice")
+        self.edit_button = QPushButton("Редактирай")
         self.edit_button.clicked.connect(self.open_edit_invoice_window)
         buttons_layout.addWidget(self.edit_button)
 
-        self.delete_button = QPushButton("Delete Invoice")
+        self.delete_button = QPushButton("Изтрий")
         self.delete_button.clicked.connect(self.delete_invoice)
         buttons_layout.addWidget(self.delete_button)
 
-        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button = QPushButton("Обнови")
         self.refresh_button.clicked.connect(self.load_invoices)
         buttons_layout.addWidget(self.refresh_button)
 
-        self.export_button = QPushButton("Export to XLSX")
+        self.export_button = QPushButton("Експортиране в XLSX")
         self.export_button.clicked.connect(self.export_to_xlsx)
         buttons_layout.addWidget(self.export_button)
 
-        self.import_button = QPushButton("Import from XLSX")
+        self.import_button = QPushButton("Импортиране от XLSX")
         self.import_button.clicked.connect(self.import_from_xlsx)
         buttons_layout.addWidget(self.import_button)
 
@@ -119,10 +118,10 @@ class InvoicesWindow(QDialog):
         if file_path:
             workbook = Workbook()
             sheet = workbook.active
-            sheet.title = "Invoices"
+            sheet.title = "Фактури"
 
-            headers = ["Number", "Customer Ref No", "Selling Company Ref No", "Date", "Products",
-                       "Total Amount", "Amount Paid", "Change", "Payment Type"]
+            headers = ["Номер", "Контрагент No", "Продавач No", "Дата", "Продукти",
+                            "Обща сума", "Платено", "Ресто", "Метод на плащане"]
             sheet.append(headers)
 
             for row in range(self.table.rowCount()):
@@ -159,122 +158,10 @@ class InvoicesWindow(QDialog):
             connection.commit()
             connection.close()
 
-# class AddInvoiceWindow(QDialog):
-#     def __init__(self, table):
-#         super().__init__()
-#         self.setWindowTitle("Add Invoice")
-#         self.setGeometry(100, 100, 400, 500)
-#         self.table = table
-#
-#         layout = QVBoxLayout()
-#
-#         self.number_input = QLineEdit()
-#         self.number_input.setReadOnly(True)
-#         self.number_input.setText(self.generate_invoice_number())
-#         self.customer_ref_no_input = QLineEdit()
-#         self.customer_ref_no_input.setReadOnly(True)
-#         self.customer_ref_no_input.mouseDoubleClickEvent = self.open_customers_window
-#         self.selling_company_ref_no_input = QLineEdit()
-#         self.selling_company_ref_no_input.setReadOnly(True)
-#         self.selling_company_ref_no_input.mouseDoubleClickEvent = self.open_firm_window
-#         self.date_input = QDateEdit(calendarPopup=True)
-#         self.date_input.setDate(QDate.currentDate())
-#         self.products_input = QLineEdit()
-#         self.products_input.setReadOnly(True)
-#         self.products_input.mouseDoubleClickEvent = self.open_products_window
-#         self.total_amount_input = QLineEdit()
-#         self.amount_paid_input = QLineEdit()
-#         self.change_input = QLineEdit()
-#         self.payment_type_input = QLineEdit()
-#
-#         layout.addWidget(QLabel("Number"))
-#         layout.addWidget(self.number_input)
-#         layout.addWidget(QLabel("Customer Ref No"))
-#         layout.addWidget(self.customer_ref_no_input)
-#         layout.addWidget(QLabel("Selling Company Ref No"))
-#         layout.addWidget(self.selling_company_ref_no_input)
-#         layout.addWidget(QLabel("Date"))
-#         layout.addWidget(self.date_input)
-#         layout.addWidget(QLabel("Products"))
-#         layout.addWidget(self.products_input)
-#         layout.addWidget(QLabel("Total Amount"))
-#         layout.addWidget(self.total_amount_input)
-#         layout.addWidget(QLabel("Amount Paid"))
-#         layout.addWidget(self.amount_paid_input)
-#         layout.addWidget(QLabel("Change"))
-#         layout.addWidget(self.change_input)
-#         layout.addWidget(QLabel("Payment Type"))
-#         layout.addWidget(self.payment_type_input)
-#
-#         add_button = QPushButton("Add")
-#         add_button.clicked.connect(self.add_invoice)
-#         layout.addWidget(add_button)
-#
-#         self.setLayout(layout)
-#
-#     def open_customers_window(self, event):
-#         self.customers_window = CustomersWindow(self)
-#         self.customers_window.exec()
-#
-#     def open_firm_window(self, event):
-#         self.firm_window = FirmWindow(self)
-#         self.firm_window.exec()
-#
-#     def open_products_window(self, event):
-#         self.products_window = ProductsWindow(self)
-#         self.products_window.exec()
-#
-#     def generate_invoice_number(self):
-#         connection = sqlite3.connect(DB_PATH)
-#         cursor = connection.cursor()
-#         cursor.execute('SELECT MAX(number) FROM invoices')
-#         result = cursor.fetchone()
-#         connection.close()
-#         if result[0] is not None:
-#             return str(int(result[0]) + 1).zfill(10)
-#         else:
-#             return "0000000001"
-#
-#     def add_invoice(self):
-#         number = self.number_input.text()
-#         customer_ref_no = self.customer_ref_no_input.text()
-#         selling_company_ref_no = self.selling_company_ref_no_input.text()
-#         date = self.date_input.date().toString("yyyy-MM-dd")
-#         products = self.products_input.text()
-#         total_amount = self.total_amount_input.text()
-#         amount_paid = self.amount_paid_input.text()
-#         change = self.change_input.text()
-#         payment_type = self.payment_type_input.text()
-#
-#         row_position = self.table.rowCount()
-#         self.table.insertRow(row_position)
-#         self.table.setItem(row_position, 0, QTableWidgetItem(number))
-#         self.table.setItem(row_position, 1, QTableWidgetItem(customer_ref_no))
-#         self.table.setItem(row_position, 2, QTableWidgetItem(selling_company_ref_no))
-#         self.table.setItem(row_position, 3, QTableWidgetItem(date))
-#         self.table.setItem(row_position, 4, QTableWidgetItem(products))
-#         self.table.setItem(row_position, 5, QTableWidgetItem(total_amount))
-#         self.table.setItem(row_position, 6, QTableWidgetItem(amount_paid))
-#         self.table.setItem(row_position, 7, QTableWidgetItem(change))
-#         self.table.setItem(row_position, 8, QTableWidgetItem(payment_type))
-#
-#         connection = sqlite3.connect(DB_PATH)
-#         cursor = connection.cursor()
-#         cursor.execute('''
-#             INSERT INTO invoices (number, customer_ref_no, selling_company_ref_no, date, products,
-#                                   total_amount, amount_paid, change, payment_type)
-#             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-#         ''', (number, customer_ref_no, selling_company_ref_no, date, products, total_amount, amount_paid, change, payment_type))
-#         connection.commit()
-#         connection.close()
-#
-#         self.accept()
-
-# In the AddInvoiceWindow class, modify the __init__ method as follows:
 class AddInvoiceWindow(QDialog):
     def __init__(self, table):
         super().__init__()
-        self.setWindowTitle("Add Invoice")
+        self.setWindowTitle("Нова фактура")
         self.setGeometry(100, 100, 400, 500)
         self.table = table
 
@@ -301,28 +188,28 @@ class AddInvoiceWindow(QDialog):
         self.change_input = QLineEdit()
         self.change_input.setReadOnly(True)
         self.payment_type_input = QComboBox()
-        self.payment_type_input.addItems(["Cash", "Credit Card", "Debit Card", "Online Payment"])
+        self.payment_type_input.addItems(["В брой", "С карта", "По банка", "С чек"])
 
-        layout.addWidget(QLabel("Number"))
+        layout.addWidget(QLabel("Номер"))
         layout.addWidget(self.number_input)
-        layout.addWidget(QLabel("Customer Ref No"))
+        layout.addWidget(QLabel("Контрагент No"))
         layout.addWidget(self.customer_ref_no_input)
-        layout.addWidget(QLabel("Selling Company Ref No"))
+        layout.addWidget(QLabel("Продавач No"))
         layout.addWidget(self.selling_company_ref_no_input)
-        layout.addWidget(QLabel("Date"))
+        layout.addWidget(QLabel("Дата"))
         layout.addWidget(self.date_input)
-        layout.addWidget(QLabel("Products"))
+        layout.addWidget(QLabel("Продукти"))
         layout.addWidget(self.products_input)
-        layout.addWidget(QLabel("Total Amount"))
+        layout.addWidget(QLabel("Обща сума"))
         layout.addWidget(self.total_amount_input)
-        layout.addWidget(QLabel("Amount Paid"))
+        layout.addWidget(QLabel("Платено"))
         layout.addWidget(self.amount_paid_input)
-        layout.addWidget(QLabel("Change"))
+        layout.addWidget(QLabel("Ресто"))
         layout.addWidget(self.change_input)
-        layout.addWidget(QLabel("Payment Type"))
+        layout.addWidget(QLabel("Метод на плащане"))
         layout.addWidget(self.payment_type_input)
 
-        add_button = QPushButton("Add")
+        add_button = QPushButton("Нов")
         add_button.clicked.connect(self.add_invoice)
         layout.addWidget(add_button)
 
@@ -400,7 +287,7 @@ class AddInvoiceWindow(QDialog):
 class EditInvoiceWindow(QDialog):
     def __init__(self, table, row):
         super().__init__()
-        self.setWindowTitle("Edit Invoice")
+        self.setWindowTitle("Редактиране")
         self.setGeometry(100, 100, 400, 500)
         self.table = table
         self.row = row
@@ -417,28 +304,28 @@ class EditInvoiceWindow(QDialog):
         self.change_input = QLineEdit()
         self.payment_type_input = QLineEdit()
 
-        layout.addWidget(QLabel("Number"))
+        layout.addWidget(QLabel("Номер"))
         layout.addWidget(self.number_input)
-        layout.addWidget(QLabel("Customer Ref No"))
+        layout.addWidget(QLabel("Контрагент No"))
         layout.addWidget(self.customer_ref_no_input)
-        layout.addWidget(QLabel("Selling Company Ref No"))
+        layout.addWidget(QLabel("Продавач No"))
         layout.addWidget(self.selling_company_ref_no_input)
-        layout.addWidget(QLabel("Date"))
+        layout.addWidget(QLabel("Дата"))
         layout.addWidget(self.date_input)
-        layout.addWidget(QLabel("Products"))
+        layout.addWidget(QLabel("Продукти"))
         layout.addWidget(self.products_input)
-        layout.addWidget(QLabel("Total Amount"))
+        layout.addWidget(QLabel("Обща сума"))
         layout.addWidget(self.total_amount_input)
-        layout.addWidget(QLabel("Amount Paid"))
+        layout.addWidget(QLabel("Платено"))
         layout.addWidget(self.amount_paid_input)
-        layout.addWidget(QLabel("Change"))
+        layout.addWidget(QLabel("Ресто"))
         layout.addWidget(self.change_input)
-        layout.addWidget(QLabel("Payment Type"))
+        layout.addWidget(QLabel("Метод на плащане"))
         layout.addWidget(self.payment_type_input)
 
         self.load_invoice()
 
-        edit_button = QPushButton("Edit")
+        edit_button = QPushButton("Запази")
         edit_button.clicked.connect(self.edit_invoice)
         layout.addWidget(edit_button)
 
@@ -493,19 +380,19 @@ class EditInvoiceWindow(QDialog):
 class CustomersWindow(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle("Select Customer")
+        self.setWindowTitle("Избери Контрагент")
         self.setGeometry(100, 100, 400, 300)
 
         layout = QVBoxLayout()
 
         self.table = QTableWidget()
         self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["ID", "Name"])
+        self.table.setHorizontalHeaderLabels(["ID", "Име на фирма"])
         layout.addWidget(self.table)
 
         self.load_customers()
 
-        select_button = QPushButton("Select")
+        select_button = QPushButton("Избери")
         select_button.clicked.connect(self.select_customer)
         layout.addWidget(select_button)
 
@@ -531,12 +418,10 @@ class CustomersWindow(QDialog):
             self.parent().customer_ref_no_input.setText(customer_id)
             self.accept()
 
-# Update the ProductsWindow class:
-# Update the ProductsWindow class:
 class ProductsWindow(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle("Select Products")
+        self.setWindowTitle("Избери Продукти")
         self.setGeometry(100, 100, 600, 400)
         self.parent = parent
 
@@ -544,13 +429,13 @@ class ProductsWindow(QDialog):
 
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["ID", "Name", "Quantity", "Unit Price"])
+        self.table.setHorizontalHeaderLabels(["ID", "Име на продукт", "Количество", "Ед. цена"])
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         layout.addWidget(self.table)
 
         self.load_products()
 
-        select_button = QPushButton("Select")
+        select_button = QPushButton("Избери")
         select_button.clicked.connect(self.select_products)
         layout.addWidget(select_button)
 
@@ -581,7 +466,7 @@ class ProductsWindow(QDialog):
                 quantity = int(self.table.item(row, 2).text())
                 unit_price = float(self.table.item(row, 3).text())
                 total_price += quantity * unit_price
-                selected_products.append(f"{product_name} (Qty: {quantity}, Unit Price: {unit_price:.2f})")
+                selected_products.append(f"{product_name} (К-во: {quantity}, Ед. цена: {unit_price:.2f})")
 
         self.parent.products_input.setText('; '.join(selected_products))
         self.parent.total_amount_input.setText(f"{total_price:.2f}")
@@ -589,23 +474,22 @@ class ProductsWindow(QDialog):
         self.parent.change_input.setText("0.00")
         self.accept()
 
-
 class FirmWindow(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle("Select Firm")
+        self.setWindowTitle("Избери продавач")
         self.setGeometry(100, 100, 400, 300)
 
         layout = QVBoxLayout()
 
         self.table = QTableWidget()
         self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["ID", "Name"])
+        self.table.setHorizontalHeaderLabels(["ID", "Име на фирма"])
         layout.addWidget(self.table)
 
         self.load_firms()
 
-        select_button = QPushButton("Select")
+        select_button = QPushButton("Избери")
         select_button.clicked.connect(self.select_firm)
         layout.addWidget(select_button)
 
