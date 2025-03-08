@@ -53,10 +53,10 @@ class SettingsWindow(QDialog):
         first_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         first_input = QComboBox()
         self.second_input = QComboBox()
-        self.second_input.addItems(["Something"])
+        self.second_input.addItems(["S25"])
         self.update_second_combo_box(first_input.currentIndex())
         first_input.currentIndexChanged.connect(self.update_second_combo_box)
-        first_input.addItems(["Daisy", "Datecs", "Tremol"])
+        first_input.addItems(["Tremol", "Datecs", "Daisy"])
         row1_layout.addWidget(first_title)
         row1_layout.addWidget(first_input)
 
@@ -84,7 +84,7 @@ class SettingsWindow(QDialog):
         fifth_title = QLabel("Скорост")
         fifth_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         fifth_input = QComboBox()
-        fifth_input.addItems(["9600", "19200", "38400", "57600", "115200"])
+        fifth_input.addItems(["115200", "9600", "19200", "38400", "57600"])
         row5_layout.addWidget(fifth_title)
         row5_layout.addWidget(fifth_input)
 
@@ -137,7 +137,7 @@ class SettingsWindow(QDialog):
         # Add frames to the first tab layout
         self.tab1_layout.addWidget(first_frame)
         self.tab1_layout.addWidget(second_frame)
-        self.tab1_layout.addWidget(third_frame)
+        # self.tab1_layout.addWidget(third_frame)
 
 
         # User Registration Tab
@@ -148,16 +148,16 @@ class SettingsWindow(QDialog):
         self.username_input = QLineEdit()
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        register_button = QPushButton("Register")
+        register_button = QPushButton("Регистрация")
         register_button.clicked.connect(self.register_user)
 
-        user_registration_layout.addWidget(QLabel("Username"))
+        user_registration_layout.addWidget(QLabel("Потр. име"))
         user_registration_layout.addWidget(self.username_input)
-        user_registration_layout.addWidget(QLabel("Password"))
+        user_registration_layout.addWidget(QLabel("Парола"))
         user_registration_layout.addWidget(self.password_input)
         user_registration_layout.addWidget(register_button)
 
-        self.tabs.addTab(user_registration_frame, "User Registration")
+        self.tabs.addTab(user_registration_frame, "Регистрация на потребител")
 
         # Add the second tab
         self.tab2 = QWidget()
@@ -266,10 +266,10 @@ class SettingsWindow(QDialog):
 
     def update_second_combo_box(self, index):
         self.second_input.clear()
-        if index == 0:
+        if index == 2:
             self.second_input.addItems(["Compact S 01", "Compact M 02", "Perfect S 01", "Perfect M 01", "eXpert SX 01"])
         elif index == 1:
             self.second_input.addItems(["DP-150", "DP-150 MX", "DP-25", "DP-25 MX", "WP-50"])
-        elif index == 2:
+        elif index == 0:
             self.second_input.addItems(["S25", "M20", "M23", "ZM", "ZS", "S21", "A19 Plus"])
 

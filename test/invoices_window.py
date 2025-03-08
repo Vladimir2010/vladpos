@@ -5,6 +5,11 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate
 from openpyxl import Workbook, load_workbook
+from PyQt6.QtGui import QPainter
+from PyQt6.QtPrintSupport import QPrinter, QPrintDialog  # За работа с печат
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+# from invoice_creator import create_invoice
 
 DB_PATH = "database/pos_system.db"
 
@@ -44,6 +49,21 @@ class InvoicesWindow(QDialog):
         self.edit_button.clicked.connect(self.open_edit_invoice_window)
         buttons_layout.addWidget(self.edit_button)
 
+        # self.generate_invoice_button = QPushButton("Генерирай фактура")
+        # self.generate_invoice_button.clicked.connect(self.generate_invoice)
+        # buttons_layout.addWidget(self.generate_invoice_button)
+
+        self.invoice_label = QLabel("Invoice Details Here")  # Replace with actual invoice details
+        buttons_layout.addWidget(self.invoice_label)
+
+        print_button = QPushButton("Print Invoice")
+        print_button.clicked.connect(self.print_invoice)
+        buttons_layout.addWidget(print_button)
+
+        export_button = QPushButton("Export to PDF")
+        export_button.clicked.connect(self.export_to_pdf)
+        buttons_layout.addWidget(export_button)
+
         self.delete_button = QPushButton("Изтрий")
         self.delete_button.clicked.connect(self.delete_invoice)
         buttons_layout.addWidget(self.delete_button)
@@ -66,6 +86,45 @@ class InvoicesWindow(QDialog):
         main_layout.addWidget(second_frame)
 
         self.setLayout(main_layout)
+
+
+
+    def print_invoice(self):
+        printer = QPrinter()
+        print_dialog = QPrintDialog(printer, self)
+        if print_dialog.exec() == QDialog.DialogCode.Accepted:
+            painter = QPainter()
+            painter.begin(printer)
+            screen_pixmap = self.grab()
+            painter.drawPixmap(10, 10, screen_pixmap)
+            painter.end()
+            QMessageBox.information(self, "Print", "Printing the invoice...")
+
+
+    def export_to_pdf(self):
+        pdf_file = "invoice.pdf"
+        # Данни за тест
+        data = {
+            "invoice_number": "0000001824",
+            "date": "26.08.2024",
+            "recipient_name": "СТАНИМИР БОРИСОВ БОЖИЛОВ",
+            "recipient_vat": "BG131413172",
+            "recipient_id": "131413172",
+            "recipient_city": "Ихтиман",
+            "recipient_address": "ул. ГЕОРГИ РАКОВСКИ 40А",
+
+            "supplier_name": "Профинанс Д и Д ЕООД",
+            "supplier_vat": "206335057",
+            "supplier_id": "206335057",
+            "supplier_city": "София",
+            "supplier_address": "ж.к. Христо Смирненски, бл.20",
+            "items": [
+                {"name": "Смяна на СИМ", "unit": "бр.", "quantity": 1, "price": 15.00, "total": 15.00}
+            ],
+            "total": 15.00
+        }
+
+        create_invoice(pdf_file, data)
 
     def load_invoices(self):
         connection = sqlite3.connect(DB_PATH)
@@ -100,6 +159,9 @@ class InvoicesWindow(QDialog):
         if current_row >= 0:
             self.edit_invoice_window = EditInvoiceWindow(self.table, current_row)
             self.edit_invoice_window.exec()
+
+    def generate_invoice(self):
+        pass
 
     def delete_invoice(self):
         current_row = self.table.currentRow()
@@ -157,6 +219,8 @@ class InvoicesWindow(QDialog):
                 ''', row)
             connection.commit()
             connection.close()
+
+
 
 class AddInvoiceWindow(QDialog):
     def __init__(self, table):

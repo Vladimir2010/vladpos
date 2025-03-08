@@ -6,7 +6,7 @@ import subprocess
 import sys
 import psycopg2
 from docx import Document
-from PyQt6.QtCore import Qt,QDate
+from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QAction, QIntValidator, QDoubleValidator, QPainter, QPixmap, QIcon
 from PyQt6.QtPrintSupport import QPrinter, QPrintDialog  # За работа с печат
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTableWidget, QTableWidgetItem, QWidget, QDialog, QLabel, \

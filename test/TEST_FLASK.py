@@ -19,6 +19,7 @@ from products_window import ProductsWindow
 from settings_window import SettingsWindow
 from help_window import HelpWindow
 from cash_register import CashRegisterWindow
+from communication.communication_tremol import FiscalPrinter
 # from login_window import LoginWindow
 
 
@@ -107,7 +108,7 @@ class MainWindow(QMainWindow):
         cash_register_action = QAction(QIcon('receipt.png'), 'Касов апарат', self)
         cash_register_action.triggered.connect(self.open_cash_register_window)
         cash_register_menu.addAction(cash_register_action)
-        menubar.addMenu(cash_register_menu)
+        # menubar.addMenu(cash_register_menu)
 
         # Create Spravki menu
         spravki_menu = QMenu("Справки", self)
@@ -128,7 +129,7 @@ class MainWindow(QMainWindow):
         spravki_sales_action.triggered.connect(self.open_spravki_sales_window)
         spravki_menu.addAction(spravki_sales_action)
 
-        menubar.addMenu(spravki_menu)
+        # menubar.addMenu(spravki_menu)
 
         # Create New Menu
         new_menu = QMenu("Продукти", self)
@@ -161,7 +162,7 @@ class MainWindow(QMainWindow):
         invoices_action = QAction(QIcon('invoice.png'), 'Фактури', self)
         invoices_action.triggered.connect(self.open_invoices_window)
         invoices_menu.addAction(invoices_action)
-        menubar.addMenu(invoices_menu)
+        # menubar.addMenu(invoices_menu)
 
         # Create Settings menu
         settings_menu = QMenu("Настройки", self)
@@ -215,6 +216,7 @@ class MainWindow(QMainWindow):
 
         self.popup_menu1 = QComboBox()
         self.popup_menu1.addItems(["А", "Б", "В", "Г"])
+        self.popup_menu1.setCurrentIndex(1)
         frame1_layout.addWidget(self.popup_menu1, 2)  # A little bit more bigger
 
         self.add_button = QPushButton("Добави")
@@ -256,8 +258,8 @@ class MainWindow(QMainWindow):
         sub_frame2_layout.addWidget(self.popup_menu2)
         button1 = QPushButton("Фискален бон")
         sub_frame2_layout.addWidget(button1)
-        button2 = QPushButton("Ф-ра")
-        sub_frame2_layout.addWidget(button2)
+        # button2 = QPushButton("Ф-ра")
+        # sub_frame2_layout.addWidget(button2)
 
         sub_frame3 = QFrame()
         sub_frame3.setFrameShape(QFrame.Shape.NoFrame)
@@ -267,8 +269,10 @@ class MainWindow(QMainWindow):
         self.input4.setPlaceholderText("Обща сума")
         sub_frame3_layout.addWidget(self.input4)
         button3 = QPushButton("X отчет")
+        button3.clicked.connect(self.print_x)
         sub_frame3_layout.addWidget(button3)
         button4 = QPushButton("Z отчет")
+        button4.clicked.connect(self.print_z)
         sub_frame3_layout.addWidget(button4)
 
         sub_frame4 = QFrame()
@@ -282,7 +286,7 @@ class MainWindow(QMainWindow):
         self.input6.setPlaceholderText("Ресто")
         sub_frame4_layout.addWidget(self.input6)
         button5 = QPushButton("Служебен бон")
-        sub_frame4_layout.addWidget(button5)
+        # sub_frame4_layout.addWidget(button5)
         # button6 = QPushButton("Button 6")
         # sub_frame4_layout.addWidget(button6)
         self.input5.textChanged.connect(self.update_change)
@@ -386,7 +390,30 @@ class MainWindow(QMainWindow):
         amount_paid = float(self.input5.text())
         change = float(self.input6.text())
         payment_type = self.popup_menu2.currentText()
-        cash_register_numbers = ""
+        cash_register_numbers = "ZK178229; 50231282"
+        commands = [
+            b'\x09',
+            b'\x02\x23\x98\x20\x39\x3b\x0a',
+            b'\x02\x23\x99\x68\x3d\x32\x0a',
+            b'\x02\x31\x9a\x30\x31\x3b\x30\x20\x20\x20\x20\x20\x3b\x30\x3b\x30\x3b\x30\x38\x3a\x0a',
+        ]
+        for product in products:
+            if product["Име"] == "Супа топчета":
+                commands.append(b'\x02\x2b\x9b\x32\x2b\x30\x30\x30\x30\x31\x2a\x31\x38\x33\x0a')
+            elif product["Име"] == "Вратна пържола":
+                commands.append(b'\x02\x2b\x93\x32\x2b\x30\x30\x30\x30\x32\x2a\x31\x38\x38\x0a')
+            elif product["Име"] == "Хляб":
+                commands.append(b'\x02\x2b\x83\x32\x2b\x30\x30\x30\x30\x33\x2a\x31\x39\x39\x0a')
+            elif product["Име"] == "Крем карамел":
+                commands.append(b'\x02\x2b\x20\x32\x2b\x30\x30\x30\x30\x34\x2a\x31\x33\x3d\x0a')
+        commands.append(b'\x02\x26\x8c\x33\x30\x3b\x31\x3a\x33\x0a')
+        commands.append(b'\x02\x2b\x8e\x35\x30\x3b\x30\x3b\x32\x30\x3b\x30\x39\x39\x0a')
+        commands.append(b'\x02\x23\x87\x38\x39\x3c\x0a')
+
+        printer = FiscalPrinter(connection_type="serial", port="COM4")
+        printer.connect()
+        for cmd in commands:
+            printer.send_command(cmd)
 
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
@@ -436,7 +463,7 @@ class MainWindow(QMainWindow):
         self.input1.clear()
         self.input2.clear()
         self.input3.clear()
-        self.popup_menu1.setCurrentIndex(0)
+        self.popup_menu1.setCurrentIndex(1)
 
         self.update_totals()
 
@@ -482,6 +509,67 @@ class MainWindow(QMainWindow):
     def open_invoices_window(self):
         self.invoices_window = InvoicesWindow()
         self.invoices_window.exec()
+
+    def print_x(self):
+        printer = FiscalPrinter(connection_type="serial", port="COM4")  # Или "/dev/ttyUSB0" за Linux
+
+        printer.connect()
+
+        # Командите, които трябва да бъдат изпратени - X
+        commands = [
+            b'\x09',
+            b'\x09',
+            b'\x02\x23\x26\x61\x36\x34\x0a',
+            b'\x09',
+            b'\x02\x23\x27\x21\x32\x35\x0a',
+            b'\x09',
+            b'\x02\x23\x28\x60\x36\x3b\x0a',
+            b'\x09',
+            b'\x02\x24\x29\x7c\x58\x32\x39\x0a'
+        ]
+
+        # Изпращане на командите една по една
+        for cmd in commands:
+            printer.send_command(cmd)
+
+        printer.disconnect()
+
+    def print_z(self):
+        printer = FiscalPrinter(connection_type="serial", port="COM4")  # Или "/dev/ttyUSB0" за Linux
+        # printer = FiscalPrinter(connection_type="tcp", host="192.168.1.100", tcp_port=5555)
+
+        printer.connect()
+
+        # Командите, които трябва да бъдат изпратени - X
+        # Z otchet
+        commands = [
+            b'\x09',
+            b'\x09',
+            b'\x02\x23\x2a\x60\x36\x39\x0a',
+            b'\x09',
+            b'\x02\x23\x2b\x61\x36\x39\x0a',
+            b'\x09',
+            b'\x02\x23\x2c\x21\x32\x3e\x0a',
+            b'\x09',
+            b'\x02\x23\x2d\x60\x36\x3e\x0a',
+            b'\x09',
+            b'\x02\x24\x2e\x7c\x5a\x32\x3c\x0a'
+            b'\x09',
+        ]
+
+        # Изпращане на командите една по една
+        for cmd in commands:
+            printer.send_command(cmd)
+
+        printer.disconnect()
+
+    def print_fiscal_receipt(self):
+        printer = FiscalPrinter(connection_type="serial", port="COM4")
+        printer.connect()
+
+        commands = [
+
+        ]
 
     def exit_program(self):
         reply = QMessageBox.question(self, 'Exit', 'Are you sure you want to exit?',
