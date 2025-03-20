@@ -2,7 +2,7 @@ import serial
 import socket
 import re  # За почистване на излишни кодове
 import time
-
+from commands_generator_tremol import FiscalCommand
 
 
 class FiscalPrinter:
@@ -74,7 +74,8 @@ class FiscalPrinter:
             return None
 
         # Форматираме командата със StartByte (0x02) и EndByte (0x03)
-        final_command = b'\x02' + command + self.calculate_crc(command) + b'\x03'
+        # final_command = b'\x02' + command + self.calculate_crc(command) + b'\x03'
+        final_command = bytes.fromhex(command)
 
         try:
             self.conn.write(final_command) if self.connection_type == "serial" else self.conn.send(final_command)
@@ -100,76 +101,36 @@ class FiscalPrinter:
 # ==========================
 # === Автоматично изпращане на зададените команди ===
 # ==========================
-# if __name__ == "__main__":
-#     printer = FiscalPrinter(connection_type="serial", port="COM4")  # Или "/dev/ttyUSB0" за Linux
-#     # printer = FiscalPrinter(connection_type="tcp", host="192.168.1.100", tcp_port=5555)
-#
-#     printer.connect()
-#
-#     # Командите, които трябва да бъдат изпратени - X
-#     commands_x = [
-#         b'\x09',
-#         b'\x09',
-#         b'\x02\x23\x26\x61\x36\x34\x0a',
-#         b'\x09',
-#         b'\x02\x23\x27\x21\x32\x35\x0a',
-#         b'\x09',
-#         b'\x02\x23\x28\x60\x36\x3b\x0a',
-#         b'\x09',
-#         b'\x02\x24\x29\x7c\x58\x32\x39\x0a'
-#     ]
-#     # Z otchet
-#     commands_z = [
-#         b'\x09',
-#         b'\x09',
-#         b'\x02\x23\x2a\x60\x36\x39\x0a',
-#         b'\x09',
-#         b'\x02\x23\x2b\x61\x36\x39\x0a',
-#         b'\x09',
-#         b'\x02\x23\x2c\x21\x32\x3e\x0a',
-#         b'\x09',
-#         b'\x02\x23\x2d\x60\x36\x3e\x0a',
-#         b'\x09',
-#         b'\x02\x24\x2e\x7c\x5a\x32\x3c\x0a'
-#         b'\x09',
-#     ]
-#
-#     # commands = [
-#     #     b'\x09',
-#     #     # b'\x02\x23\x89\x20\x38\x3a\x0a',
-#     #     # b'\x09',
-#     #     # b'\x02\x23\x8a\x68\x3c\x31\x0a',
-#     #     # b'\x09',
-#     #     b'\x02\x31\x8b\x30\x31\x3b\x30\x20\x20\x20\x20\x20\x3b\x30\x3b\x30\x3b\x30\x39\x3b\x0a',
-#     #     # b'\x02\x2b\x8c\x32\x2b\x30\x30\x30\x30\x31\x2a\x31\x39\x34\x0a',#markira
-#     #     # b'\x02\x2b\x8c\x32\x2b\x30\x30\x30\x30\x32\x2a\x37\x39\x34\x0a' #- resto
-#     #     b'\x02\x2b\x2e\x32\x2b\x30\x30\x30\x30\x32\x2a\x31\x33\x35\x0a' #- #art 2
-#     #     # b'\x02\x26\x8d\x33\x30\x3b\x31\x3a\x32\x0a', #ST
-#     #     b'\x02\x2b\x8e\x35\x30\x3b\x30\x3b\x32\x30\x3b\x30\x39\x39\x0a',
-#     #     # b'\x09',
-#     #     # b'\x02\x26\x8f\x33\x30\x3b\x31\x3a\x20\x0a',
-#     #     # b'\x09',
-#     #     b'\x02\x23\x90\x38\x38\x3b\x0a'
-#     #
-#     # ]
-#
-#     # commands = [
-#     #     b'\x09',
-#     #     b'\x02 \x23 \x2a \x60 \x36 \x39 \x0a',
-#     #     b'\x09',
-#     #     b'\x02 \x23 \x2b \x61 \x36 \x39 \x0a',
-#     #     b'\x09',
-#     #     b'\x02 \x23 \x2c \x21 \x32 \x3e \x0a',
-#     #     b'\x09',
-#     #     b'\x02 \x23 \x2d \x60 \x36 \x3e \x0a',
-#     #     b'\x09',
-#     #     b'\x02 \x24 \x2e \x7c \x5a \x32 \x3c \x0a',
-#     # ]
-#
-#
-#     # Изпращане на командите една по една
-#     for cmd in commands:
-#         time.sleep(0)
-#         printer.send_command(cmd)
-#
-#     printer.disconnect()
+if __name__ == "__main__":
+    printer = FiscalPrinter(connection_type="serial", port="COM4")  # Или "/dev/ttyUSB0" за Linux
+    # printer = FiscalPrinter(connection_type="tcp", host="192.168.1.100", tcp_port=5555)
+
+    # Пример за използване
+    fiscal = FiscalCommand()
+    commands = []
+
+    commands_for_sale = [
+
+    ]
+
+    # Вход от потребителя
+    num_of_comands = int(input("Брой команди: "))
+    for i in range(num_of_comands):
+        cmd = input()
+        data = input()
+        command = fiscal.build_command(cmd, data)
+        commands.append(command)
+        print("Генерирана команда:", command)
+
+
+    printer.connect()
+
+    # Изпращане на командите една по една
+    for cmd in commands:
+        time.sleep(0)
+        printer.send_command(cmd)
+
+    printer.disconnect()
+
+
+
